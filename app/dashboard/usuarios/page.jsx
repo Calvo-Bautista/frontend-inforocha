@@ -1,0 +1,735 @@
+"use client";
+
+import { useState } from "react";
+import { systemUsers } from "@/lib/mock-data";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Plus,
+  Trash2,
+  Mail,
+  Calendar,
+  Loader2,
+  Users,
+  ShieldCheck,
+  Truck,
+  MoreHorizontal,
+  Pencil,
+  KeyRound,
+  Eye,
+  EyeOff,
+} from "lucide-react";
+
+const roleColorMap = {
+  vendedor: "bg-primary text-primary-foreground",
+  logistica: "bg-warning text-warning-foreground",
+  admin: "bg-success text-success-foreground",
+};
+
+const roleLabels = {
+  vendedor: "Vendedor",
+  logistica: "Logística",
+  admin: "Administrador",
+};
+
+export default function UsuariosPage() {
+  const [users, setUsers] = useState(systemUsers);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isPasswordOpen, setIsPasswordOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [userToEdit, setUserToEdit] = useState(null);
+  const [userToChangePassword, setUserToChangePassword] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  const [newUser, setNewUser] = useState({
+    name: "",
+    email: "",
+    role: "",
+    password: "",
+  });
+
+  const [editUser, setEditUser] = useState({
+    name: "",
+    email: "",
+    role: "",
+  });
+
+  const [passwordData, setPasswordData] = useState({
+    newPassword: "",
+    confirmPassword: "",
+  });
+
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    const user = {
+      id: users.length + 1,
+      name: newUser.name,
+      email: newUser.email,
+      role: newUser.role,
+      createdAt: new Date().toISOString().split("T")[0],
+    };
+
+    setUsers((prev) => [...prev, user]);
+    setIsSubmitting(false);
+    setIsCreateOpen(false);
+    setNewUser({ name: "", email: "", role: "", password: "" });
+    setShowPassword(false);
+  };
+
+  const handleEditUser = async (e) => {
+    e.preventDefault();
+    if (!userToEdit) return;
+    
+    setIsSubmitting(true);
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === userToEdit.id
+          ? { ...u, name: editUser.name, email: editUser.email, role: editUser.role }
+          : u
+      )
+    );
+    setIsSubmitting(false);
+    setIsEditOpen(false);
+    setUserToEdit(null);
+    setEditUser({ name: "", email: "", role: "" });
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (!userToChangePassword) return;
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      alert("Las contraseñas no coinciden");
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      alert("La contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+    
+    setIsSubmitting(true);
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    setIsSubmitting(false);
+    setIsPasswordOpen(false);
+    setUserToChangePassword(null);
+    setPasswordData({ newPassword: "", confirmPassword: "" });
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
+  };
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+
+    setIsSubmitting(true);
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    setUsers((prev) => prev.filter((u) => u.id !== userToDelete.id));
+    setIsSubmitting(false);
+    setIsDeleteOpen(false);
+    setUserToDelete(null);
+  };
+
+  const openEditDialog = (user) => {
+    setUserToEdit(user);
+    setEditUser({
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    });
+    setIsEditOpen(true);
+  };
+
+  const openPasswordDialog = (user) => {
+    setUserToChangePassword(user);
+    setPasswordData({ newPassword: "", confirmPassword: "" });
+    setIsPasswordOpen(true);
+  };
+
+  const confirmDelete = (user) => {
+    setUserToDelete(user);
+    setIsDeleteOpen(true);
+  };
+
+  const vendedores = users.filter((u) => u.role === "vendedor").length;
+  const logisticos = users.filter((u) => u.role === "logistica").length;
+  const admins = users.filter((u) => u.role === "admin").length;
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Usuarios</h1>
+          <p className="text-muted-foreground">
+            Administra los usuarios del sistema
+          </p>
+        </div>
+        <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
+          <Plus className="w-4 h-4" />
+          Nuevo Usuario
+        </Button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-primary/10 rounded-lg">
+                <Users className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{vendedores}</p>
+                <p className="text-sm text-muted-foreground">Vendedores</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-warning/10 rounded-lg">
+                <Truck className="w-6 h-6 text-warning" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{logisticos}</p>
+                <p className="text-sm text-muted-foreground">Logística</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-success/10 rounded-lg">
+                <ShieldCheck className="w-6 h-6 text-success" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{admins}</p>
+                <p className="text-sm text-muted-foreground">Administradores</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Users Table - Desktop */}
+      <Card className="hidden md:block">
+        <CardHeader>
+          <CardTitle>Lista de Usuarios</CardTitle>
+          <CardDescription>{users.length} usuarios registrados</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Rol</TableHead>
+                <TableHead>Fecha de Creación</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {users.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell className="font-medium">{user.name}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-muted-foreground" />
+                      {user.email}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={roleColorMap[user.role]}>
+                      {roleLabels[user.role]}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Calendar className="w-4 h-4" />
+                      {new Date(user.createdAt).toLocaleDateString("es-AR")}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="w-4 h-4" />
+                          <span className="sr-only">Acciones</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openEditDialog(user)}>
+                          <Pencil className="w-4 h-4 mr-2" />
+                          Editar Usuario
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => openPasswordDialog(user)}>
+                          <KeyRound className="w-4 h-4 mr-2" />
+                          Cambiar Contraseña
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => confirmDelete(user)}
+                          disabled={user.role === "admin" && admins <= 1}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Eliminar Usuario
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Users Cards - Mobile */}
+      <div className="md:hidden space-y-4">
+        {users.map((user) => (
+          <Card key={user.id}>
+            <CardContent className="pt-6">
+              <div className="flex items-start justify-between gap-4 mb-3">
+                <div>
+                  <h3 className="font-medium text-foreground">{user.name}</h3>
+                  <p className="text-sm text-muted-foreground">{user.email}</p>
+                </div>
+                <Badge className={roleColorMap[user.role]}>
+                  {roleLabels[user.role]}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5" />
+                  {new Date(user.createdAt).toLocaleDateString("es-AR")}
+                </span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm">
+                      <MoreHorizontal className="w-4 h-4 mr-1" />
+                      Acciones
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => openEditDialog(user)}>
+                      <Pencil className="w-4 h-4 mr-2" />
+                      Editar
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => openPasswordDialog(user)}>
+                      <KeyRound className="w-4 h-4 mr-2" />
+                      Cambiar Contraseña
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={() => confirmDelete(user)}
+                      disabled={user.role === "admin" && admins <= 1}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Eliminar
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Create User Dialog */}
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Crear Nuevo Usuario</DialogTitle>
+            <DialogDescription>
+              Ingresa los datos del nuevo usuario del sistema
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateUser} className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Nombre Completo</Label>
+              <Input
+                id="name"
+                placeholder="Juan Pérez"
+                value={newUser.name}
+                onChange={(e) =>
+                  setNewUser((prev) => ({ ...prev, name: e.target.value }))
+                }
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Correo Electrónico</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="usuario@rocha.com"
+                value={newUser.email}
+                onChange={(e) =>
+                  setNewUser((prev) => ({ ...prev, email: e.target.value }))
+                }
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Contraseña</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Mínimo 6 caracteres"
+                  value={newUser.password}
+                  onChange={(e) =>
+                    setNewUser((prev) => ({ ...prev, password: e.target.value }))
+                  }
+                  required
+                  minLength={6}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="role">Rol</Label>
+              <Select
+                value={newUser.role}
+                onValueChange={(value) =>
+                  setNewUser((prev) => ({ ...prev, role: value }))
+                }
+                required
+              >
+                <SelectTrigger id="role">
+                  <SelectValue placeholder="Seleccionar rol..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="vendedor">Vendedor</SelectItem>
+                  <SelectItem value="logistica">Logística</SelectItem>
+                  <SelectItem value="admin">Administrador</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCreateOpen(false)}
+                disabled={isSubmitting}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSubmitting || !newUser.name || !newUser.email || !newUser.role || !newUser.password}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creando...
+                  </>
+                ) : (
+                  "Crear Usuario"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Usuario</DialogTitle>
+            <DialogDescription>
+              Modifica los datos del usuario
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditUser} className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Nombre Completo</Label>
+              <Input
+                id="edit-name"
+                placeholder="Juan Pérez"
+                value={editUser.name}
+                onChange={(e) =>
+                  setEditUser((prev) => ({ ...prev, name: e.target.value }))
+                }
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-email">Correo Electrónico</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                placeholder="usuario@rocha.com"
+                value={editUser.email}
+                onChange={(e) =>
+                  setEditUser((prev) => ({ ...prev, email: e.target.value }))
+                }
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-role">Rol</Label>
+              <Select
+                value={editUser.role}
+                onValueChange={(value) =>
+                  setEditUser((prev) => ({ ...prev, role: value }))
+                }
+                required
+              >
+                <SelectTrigger id="edit-role">
+                  <SelectValue placeholder="Seleccionar rol..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="vendedor">Vendedor</SelectItem>
+                  <SelectItem value="logistica">Logística</SelectItem>
+                  <SelectItem value="admin">Administrador</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditOpen(false)}
+                disabled={isSubmitting}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSubmitting || !editUser.name || !editUser.email || !editUser.role}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  "Guardar Cambios"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Password Dialog */}
+      <Dialog open={isPasswordOpen} onOpenChange={setIsPasswordOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cambiar Contraseña</DialogTitle>
+            <DialogDescription>
+              {userToChangePassword && (
+                <>Establecer nueva contraseña para <strong>{userToChangePassword.name}</strong></>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleChangePassword} className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-password">Nueva Contraseña</Label>
+              <div className="relative">
+                <Input
+                  id="new-password"
+                  type={showNewPassword ? "text" : "password"}
+                  placeholder="Mínimo 6 caracteres"
+                  value={passwordData.newPassword}
+                  onChange={(e) =>
+                    setPasswordData((prev) => ({ ...prev, newPassword: e.target.value }))
+                  }
+                  required
+                  minLength={6}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showNewPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirmar Contraseña</Label>
+              <div className="relative">
+                <Input
+                  id="confirm-password"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="Repetir contraseña"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) =>
+                    setPasswordData((prev) => ({ ...prev, confirmPassword: e.target.value }))
+                  }
+                  required
+                  minLength={6}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+              {passwordData.newPassword && passwordData.confirmPassword && passwordData.newPassword !== passwordData.confirmPassword && (
+                <p className="text-xs text-destructive">Las contraseñas no coinciden</p>
+              )}
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsPasswordOpen(false)}
+                disabled={isSubmitting}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={
+                  isSubmitting || 
+                  !passwordData.newPassword || 
+                  !passwordData.confirmPassword || 
+                  passwordData.newPassword !== passwordData.confirmPassword ||
+                  passwordData.newPassword.length < 6
+                }
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  "Cambiar Contraseña"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. El usuario{" "}
+              <span className="font-medium">{userToDelete?.name}</span> será
+              eliminado permanentemente del sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSubmitting}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              disabled={isSubmitting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                "Eliminar"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
