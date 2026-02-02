@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { clients, products, formatCurrency } from "@/lib/mock-data";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,8 @@ import {
   Percent,
   Truck,
   FileText,
+  Search,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -48,17 +50,65 @@ export default function NuevaOrdenPage() {
   const [cartItems, setCartItems] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  
+
   // New states for invoice and discounts
   const [wantsFacturaA, setWantsFacturaA] = useState(false);
   const [applyDiscount, setApplyDiscount] = useState(false);
   const [waiveShipping, setWaiveShipping] = useState(false);
 
+  // Search states
+  const [clientSearchTerm, setClientSearchTerm] = useState("");
+  const [productSearchTerm, setProductSearchTerm] = useState("");
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
+  const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
+
+  // Refs for click outside
+  const clientDropdownRef = useRef(null);
+  const productDropdownRef = useRef(null);
+
   const selectedClient = clients.find((c) => c.id.toString() === selectedClientId);
   const selectedProduct = products.find((p) => p.id.toString() === selectedProductId);
 
-  const availableProducts = useMemo(() => {
-    return products.filter((p) => p.stock > 0);
+  // Filtered clients for search
+  const filteredClients = useMemo(() => {
+    const activeClients = clients.filter((c) => c.status === "active");
+    if (!clientSearchTerm.trim()) {
+      return activeClients.slice(0, 50); // Limit to 50 when no search
+    }
+    const searchLower = clientSearchTerm.toLowerCase();
+    return activeClients
+      .filter((c) =>
+        c.name.toLowerCase().includes(searchLower) ||
+        (c.legajo && c.legajo.toLowerCase().includes(searchLower))
+      )
+      .slice(0, 50); // Limit to 50 results
+  }, [clientSearchTerm]);
+
+  // Filtered products for search
+  const filteredProducts = useMemo(() => {
+    const availableProducts = products.filter((p) => p.stock > 0);
+    if (!productSearchTerm.trim()) {
+      return availableProducts.slice(0, 50); // Limit to 50 when no search
+    }
+    const searchLower = productSearchTerm.toLowerCase();
+    return availableProducts
+      .filter((p) => p.name.toLowerCase().includes(searchLower))
+      .slice(0, 50); // Limit to 50 results
+  }, [productSearchTerm]);
+
+  // Handle click outside to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (clientDropdownRef.current && !clientDropdownRef.current.contains(event.target)) {
+        setIsClientDropdownOpen(false);
+      }
+      if (productDropdownRef.current && !productDropdownRef.current.contains(event.target)) {
+        setIsProductDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleAddToCart = () => {
@@ -201,23 +251,69 @@ export default function NuevaOrdenPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="client">Cliente</Label>
-                <Select
-                  value={selectedClientId}
-                  onValueChange={setSelectedClientId}
-                >
-                  <SelectTrigger id="client">
-                    <SelectValue placeholder="Seleccionar cliente..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients
-                      .filter((c) => c.status === "active")
-                      .map((client) => (
-                        <SelectItem key={client.id} value={client.id.toString()}>
-                          {client.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                <div className="relative" ref={clientDropdownRef}>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
+                    <Input
+                      id="client"
+                      placeholder={selectedClient ? selectedClient.name : "Buscar cliente por nombre..."}
+                      value={clientSearchTerm}
+                      onChange={(e) => setClientSearchTerm(e.target.value)}
+                      onFocus={() => setIsClientDropdownOpen(true)}
+                      className="pl-9 pr-9"
+                    />
+                    {selectedClient && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedClientId("");
+                          setClientSearchTerm("");
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground z-10"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {isClientDropdownOpen && !selectedClient && (
+                    <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                      {filteredClients.length > 0 ? (
+                        <>
+                          <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border">
+                            {filteredClients.length === 50 ? "Mostrando primeros 50 resultados" : `${filteredClients.length} cliente(s) encontrado(s)`}
+                          </div>
+                          {filteredClients.map((client) => (
+                            <button
+                              key={client.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedClientId(client.id.toString());
+                                setClientSearchTerm("");
+                                setIsClientDropdownOpen(false);
+                              }}
+                              className="w-full px-3 py-2 text-left hover:bg-accent transition-colors border-b border-border last:border-0"
+                            >
+                              <div className="flex items-center justify-between">
+                                <p className="font-medium text-sm">{client.name}</p>
+                                {client.legajo && (
+                                  <span className="font-mono text-xs text-muted-foreground">
+                                    {client.legajo}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground">{client.phone}</p>
+                            </button>
+                          ))}
+                        </>
+                      ) : (
+                        <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                          No se encontraron clientes
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {selectedClient && (
@@ -270,26 +366,69 @@ export default function NuevaOrdenPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="product">Producto</Label>
-                <Select
-                  value={selectedProductId}
-                  onValueChange={setSelectedProductId}
-                >
-                  <SelectTrigger id="product">
-                    <SelectValue placeholder="Seleccionar producto..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableProducts.map((product) => (
-                      <SelectItem key={product.id} value={product.id.toString()}>
-                        <span className="flex items-center justify-between gap-4 w-full">
-                          <span>{product.name}</span>
-                          <span className="text-muted-foreground text-xs">
-                            Stock: {product.stock}
-                          </span>
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="relative" ref={productDropdownRef}>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
+                    <Input
+                      id="product"
+                      placeholder={selectedProduct ? selectedProduct.name : "Buscar producto por nombre..."}
+                      value={productSearchTerm}
+                      onChange={(e) => setProductSearchTerm(e.target.value)}
+                      onFocus={() => setIsProductDropdownOpen(true)}
+                      className="pl-9 pr-9"
+                    />
+                    {selectedProduct && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedProductId("");
+                          setProductSearchTerm("");
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground z-10"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {isProductDropdownOpen && !selectedProduct && (
+                    <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                      {filteredProducts.length > 0 ? (
+                        <>
+                          <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border">
+                            {filteredProducts.length === 50 ? "Mostrando primeros 50 resultados" : `${filteredProducts.length} producto(s) encontrado(s)`}
+                          </div>
+                          {filteredProducts.map((product) => (
+                            <button
+                              key={product.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedProductId(product.id.toString());
+                                setProductSearchTerm("");
+                                setIsProductDropdownOpen(false);
+                              }}
+                              className="w-full px-3 py-2 text-left hover:bg-accent transition-colors border-b border-border last:border-0"
+                            >
+                              <div className="flex items-center justify-between">
+                                <p className="font-medium text-sm">{product.name}</p>
+                                <span className="text-xs text-muted-foreground">
+                                  Stock: {product.stock}
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {formatCurrency(product.price)}
+                              </p>
+                            </button>
+                          ))}
+                        </>
+                      ) : (
+                        <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                          No se encontraron productos
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {selectedProduct && (
@@ -402,7 +541,7 @@ export default function NuevaOrdenPage() {
                   {/* Discount Options */}
                   <div className="border-t border-border pt-4 space-y-3">
                     <p className="text-sm font-medium text-foreground">Descuentos</p>
-                    
+
                     {/* Percentage Discount */}
                     <div className={cn(
                       "flex items-center justify-between p-3 rounded-lg",
@@ -421,7 +560,7 @@ export default function NuevaOrdenPage() {
                             "cursor-pointer font-normal text-sm",
                             availableDiscountPercent === 0 && "text-muted-foreground"
                           )}>
-                            {availableDiscountPercent > 0 
+                            {availableDiscountPercent > 0
                               ? `Aplicar ${availableDiscountPercent}% descuento`
                               : "Descuento no disponible"
                             }
@@ -434,10 +573,10 @@ export default function NuevaOrdenPage() {
                         </span>
                       )}
                     </div>
-                    
+
                     {availableDiscountPercent === 0 && cartSubtotal > 0 && (
                       <p className="text-xs text-muted-foreground px-1">
-                        {cartSubtotal < 100000 
+                        {cartSubtotal < 100000
                           ? `Faltan ${formatCurrency(100000 - cartSubtotal)} para obtener 5% de descuento`
                           : ""
                         }

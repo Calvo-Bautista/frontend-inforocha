@@ -108,6 +108,9 @@ export function LoginForm() {
                 <p>
                   <span className="font-medium">Admin:</span> admin@rocha.com
                 </p>
+                <p>
+                  <span className="font-medium">Owner:</span> owner@rocha.com
+                </p>
                 <p className="text-center mt-2">
                   Contraseña: <span className="font-mono">123456</span>
                 </p>

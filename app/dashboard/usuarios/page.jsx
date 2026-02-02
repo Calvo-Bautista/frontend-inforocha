@@ -67,22 +67,26 @@ import {
   KeyRound,
   Eye,
   EyeOff,
+  Search,
 } from "lucide-react";
 
 const roleColorMap = {
   vendedor: "bg-primary text-primary-foreground",
   logistica: "bg-warning text-warning-foreground",
   admin: "bg-success text-success-foreground",
+  owner: "bg-purple-600 text-white",
 };
 
 const roleLabels = {
   vendedor: "Vendedor",
   logistica: "Logística",
   admin: "Administrador",
+  owner: "Owner",
 };
 
 export default function UsuariosPage() {
   const [users, setUsers] = useState(systemUsers);
+  const [searchTerm, setSearchTerm] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
@@ -94,7 +98,7 @@ export default function UsuariosPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
+
   const [newUser, setNewUser] = useState({
     name: "",
     email: "",
@@ -113,6 +117,27 @@ export default function UsuariosPage() {
     confirmPassword: "",
   });
 
+  // Generate next legajo number
+  const generateLegajo = () => {
+    const legajos = users.map(u => {
+      const match = u.legajo?.match(/LEG-(\d+)/);
+      return match ? parseInt(match[1]) : 0;
+    });
+    const maxLegajo = Math.max(...legajos, 0);
+    const nextNumber = maxLegajo + 1;
+    return `LEG-${String(nextNumber).padStart(3, '0')}`;
+  };
+
+  // Filter users by search term
+  const filteredUsers = users.filter(user => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      user.name.toLowerCase().includes(searchLower) ||
+      user.legajo?.toLowerCase().includes(searchLower) ||
+      user.email.toLowerCase().includes(searchLower)
+    );
+  });
+
   const handleCreateUser = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -124,6 +149,7 @@ export default function UsuariosPage() {
       name: newUser.name,
       email: newUser.email,
       role: newUser.role,
+      legajo: generateLegajo(),
       createdAt: new Date().toISOString().split("T")[0],
     };
 
@@ -137,7 +163,7 @@ export default function UsuariosPage() {
   const handleEditUser = async (e) => {
     e.preventDefault();
     if (!userToEdit) return;
-    
+
     setIsSubmitting(true);
 
     await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -168,7 +194,7 @@ export default function UsuariosPage() {
       alert("La contraseña debe tener al menos 6 caracteres");
       return;
     }
-    
+
     setIsSubmitting(true);
 
     await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -218,6 +244,7 @@ export default function UsuariosPage() {
   const vendedores = users.filter((u) => u.role === "vendedor").length;
   const logisticos = users.filter((u) => u.role === "logistica").length;
   const admins = users.filter((u) => u.role === "admin").length;
+  const owners = users.filter((u) => u.role === "owner").length;
 
   return (
     <div className="space-y-6">
@@ -235,8 +262,19 @@ export default function UsuariosPage() {
         </Button>
       </div>
 
+      {/* Search */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por legajo, nombre o email..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
       {/* Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
@@ -276,18 +314,32 @@ export default function UsuariosPage() {
             </div>
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-purple-600/10 rounded-lg">
+                <ShieldCheck className="w-6 h-6 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{owners}</p>
+                <p className="text-sm text-muted-foreground">Owners</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Users Table - Desktop */}
       <Card className="hidden md:block">
         <CardHeader>
           <CardTitle>Lista de Usuarios</CardTitle>
-          <CardDescription>{users.length} usuarios registrados</CardDescription>
+          <CardDescription>{filteredUsers.length} usuarios encontrados</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Legajo</TableHead>
                 <TableHead>Nombre</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Rol</TableHead>
@@ -296,8 +348,11 @@ export default function UsuariosPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((user) => (
+              {filteredUsers.map((user) => (
                 <TableRow key={user.id}>
+                  <TableCell>
+                    <span className="font-mono text-sm font-medium">{user.legajo}</span>
+                  </TableCell>
                   <TableCell className="font-medium">{user.name}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -354,11 +409,14 @@ export default function UsuariosPage() {
 
       {/* Users Cards - Mobile */}
       <div className="md:hidden space-y-4">
-        {users.map((user) => (
+        {filteredUsers.map((user) => (
           <Card key={user.id}>
             <CardContent className="pt-6">
               <div className="flex items-start justify-between gap-4 mb-3">
                 <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-mono text-xs text-muted-foreground">{user.legajo}</span>
+                  </div>
                   <h3 className="font-medium text-foreground">{user.name}</h3>
                   <p className="text-sm text-muted-foreground">{user.email}</p>
                 </div>
@@ -483,6 +541,7 @@ export default function UsuariosPage() {
                   <SelectItem value="vendedor">Vendedor</SelectItem>
                   <SelectItem value="logistica">Logística</SelectItem>
                   <SelectItem value="admin">Administrador</SelectItem>
+                  <SelectItem value="owner">Owner</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -564,6 +623,7 @@ export default function UsuariosPage() {
                   <SelectItem value="vendedor">Vendedor</SelectItem>
                   <SelectItem value="logistica">Logística</SelectItem>
                   <SelectItem value="admin">Administrador</SelectItem>
+                  <SelectItem value="owner">Owner</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -677,9 +737,9 @@ export default function UsuariosPage() {
               <Button
                 type="submit"
                 disabled={
-                  isSubmitting || 
-                  !passwordData.newPassword || 
-                  !passwordData.confirmPassword || 
+                  isSubmitting ||
+                  !passwordData.newPassword ||
+                  !passwordData.confirmPassword ||
                   passwordData.newPassword !== passwordData.confirmPassword ||
                   passwordData.newPassword.length < 6
                 }

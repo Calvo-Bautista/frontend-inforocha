@@ -32,6 +32,17 @@ const roleNavItems = {
   admin: [
     { href: "/dashboard/usuarios", label: "Usuarios", icon: UserCog },
   ],
+  owner: [
+    // Vistas de Vendedor
+    { href: "/dashboard/productos", label: "Productos", icon: Package },
+    { href: "/dashboard/clientes", label: "Compradores & Llamadas", icon: Users },
+    { href: "/dashboard/nueva-orden", label: "Nueva Orden", icon: ShoppingCart },
+    { href: "/dashboard/mis-pedidos", label: "Mis Pedidos", icon: ClipboardList },
+    // Vistas de Logística
+    { href: "/dashboard/despachos", label: "Despachos", icon: Truck },
+    // Vistas de Admin
+    { href: "/dashboard/usuarios", label: "Usuarios", icon: UserCog },
+  ],
 };
 
 export function Sidebar() {
@@ -90,8 +101,10 @@ export function Sidebar() {
             {user.role === "vendedor"
               ? "Vendedor"
               : user.role === "logistica"
-              ? "Logística"
-              : "Administrador"}
+                ? "Logística"
+                : user.role === "owner"
+                  ? "Owner"
+                  : "Administrador"}
           </span>
         </div>
         <Button

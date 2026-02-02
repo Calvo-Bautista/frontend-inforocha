@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { orders, formatCurrency, getOrderStatus } from "@/lib/mock-data";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   Card,
   CardContent,
@@ -35,7 +36,6 @@ import {
   Truck,
   Package,
   CheckCircle2,
-  ArrowRight,
   User,
   Calendar,
   MapPin,
@@ -45,7 +45,7 @@ import {
   Receipt,
   Percent,
   MessageSquare,
-  Hash,
+  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -64,13 +64,22 @@ const statusOptions = [
 
 export default function DespachosPage() {
   const [ordersList, setOrdersList] = useState(orders);
-  const [viewMode, setViewMode] = useState("list");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   const shippableOrders = useMemo(() => {
     return ordersList.filter((o) => o.status !== "pendiente");
   }, [ordersList]);
+
+  const filteredOrders = useMemo(() => {
+    return shippableOrders.filter((order) => {
+      const matchesSearch = order.id.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [shippableOrders, searchTerm, statusFilter]);
 
   const handleStatusChange = (orderId, newStatus) => {
     setOrdersList((prev) =>
@@ -101,39 +110,49 @@ export default function DespachosPage() {
     return items.reduce((acc, item) => acc + item.quantity, 0);
   };
 
+  const statusFilters = [
+    { value: "all", label: "Todas las Órdenes" },
+    { value: "preparacion", label: "En Preparación" },
+    { value: "enviado", label: "Enviado" },
+    { value: "entregado", label: "Entregado" },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Despachos</h1>
-          <p className="text-muted-foreground">
-            Prepara y gestiona el envío de los pedidos
-          </p>
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Despachos</h1>
+        <p className="text-muted-foreground">
+          Prepara y gestiona el envío de los pedidos
+        </p>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por número de orden..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9"
+          />
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setViewMode("list")}
-            className={cn(
-              "px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
-              viewMode === "list"
-                ? "bg-primary text-primary-foreground"
-                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-            )}
-          >
-            Lista
-          </button>
-          <button
-            onClick={() => setViewMode("kanban")}
-            className={cn(
-              "px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
-              viewMode === "kanban"
-                ? "bg-primary text-primary-foreground"
-                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-            )}
-          >
-            Kanban
-          </button>
+        <div className="flex gap-2 flex-wrap">
+          {statusFilters.map((filter) => (
+            <button
+              key={filter.value}
+              onClick={() => setStatusFilter(filter.value)}
+              className={cn(
+                "px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
+                statusFilter === filter.value
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              )}
+            >
+              {filter.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -181,329 +200,165 @@ export default function DespachosPage() {
       </div>
 
       {/* List View */}
-      {viewMode === "list" && (
-        <div className="space-y-4">
-          {shippableOrders.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <Truck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-foreground mb-1">
-                  No hay pedidos para despachar
-                </h3>
-                <p className="text-muted-foreground">
-                  Los pedidos pendientes aparecerán aquí cuando estén listos
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            shippableOrders.map((order) => {
-              const orderStatus = getOrderStatus(order.status);
-              const totalItems = getTotalItems(order.items);
-              return (
-                <Card key={order.id} className="overflow-hidden">
-                  <CardContent className="p-0">
-                    {/* Header row */}
-                    <div className="p-4 border-b border-border bg-muted/30">
-                      <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="font-bold text-lg">{order.id}</h3>
-                            <Badge className={statusColorMap[orderStatus.color]}>
-                              {orderStatus.label}
+      <div className="space-y-4">
+        {filteredOrders.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Truck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-foreground mb-1">
+                No se encontraron pedidos
+              </h3>
+              <p className="text-muted-foreground">
+                {searchTerm || statusFilter !== "all"
+                  ? "Intenta con otros términos de búsqueda o cambia el filtro"
+                  : "Los pedidos pendientes aparecerán aquí cuando estén listos"}
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          filteredOrders.map((order) => {
+            const orderStatus = getOrderStatus(order.status);
+            const totalItems = getTotalItems(order.items);
+            return (
+              <Card key={order.id} className="overflow-hidden">
+                <CardContent className="p-0">
+                  {/* Header row */}
+                  <div className="p-4 border-b border-border bg-muted/30">
+                    <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="font-bold text-lg">{order.id}</h3>
+                          <Badge className={statusColorMap[orderStatus.color]}>
+                            {orderStatus.label}
+                          </Badge>
+                          {order.facturaA && (
+                            <Badge variant="outline" className="border-primary text-primary">
+                              <FileText className="w-3 h-3 mr-1" />
+                              Factura A
                             </Badge>
-                            {order.facturaA && (
-                              <Badge variant="outline" className="border-primary text-primary">
-                                <FileText className="w-3 h-3 mr-1" />
-                                Factura A
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                          <span className="flex items-center gap-1.5">
+                            <User className="w-4 h-4" />
+                            {order.clientName}
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <Calendar className="w-4 h-4" />
+                            {new Date(order.date).toLocaleDateString("es-AR")}
+                          </span>
+                          <span className="flex items-center gap-1.5 font-medium text-foreground">
+                            <Package className="w-4 h-4" />
+                            {totalItems} unidades ({order.items.length} productos)
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2 bg-transparent"
+                          onClick={() => openDetail(order)}
+                        >
+                          <Eye className="w-4 h-4" />
+                          Ver Detalle
+                        </Button>
+                        <Select
+                          value={order.status}
+                          onValueChange={(value) =>
+                            handleStatusChange(order.id, value)
+                          }
+                        >
+                          <SelectTrigger className="w-44">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {statusOptions.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Info row */}
+                  <div className="p-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Dirección de Envío</p>
+                      <p className="text-sm font-medium flex items-start gap-1.5">
+                        <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-muted-foreground" />
+                        {order.clientAddress}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Teléfono</p>
+                      <p className="text-sm font-medium flex items-center gap-1.5">
+                        <Phone className="w-4 h-4 text-muted-foreground" />
+                        {order.clientPhone}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Vendedor</p>
+                      <p className="text-sm font-medium">{order.sellerName}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Total</p>
+                      <p className="text-lg font-bold text-primary">{formatCurrency(order.total)}</p>
+                    </div>
+                  </div>
+
+                  {/* Products table */}
+                  <div className="px-4 pb-4">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>SKU</TableHead>
+                          <TableHead>Producto</TableHead>
+                          <TableHead className="text-center">Cantidad</TableHead>
+                          <TableHead className="text-right">Precio Unit.</TableHead>
+                          <TableHead className="text-right">Subtotal</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {order.items.map((item, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="font-mono text-xs">{item.sku}</TableCell>
+                            <TableCell className="font-medium">{item.productName}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="secondary" className="font-bold">
+                                x{item.quantity}
                               </Badge>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1.5">
-                              <User className="w-4 h-4" />
-                              {order.clientName}
-                            </span>
-                            <span className="flex items-center gap-1.5">
-                              <Calendar className="w-4 h-4" />
-                              {new Date(order.date).toLocaleDateString("es-AR")}
-                            </span>
-                            <span className="flex items-center gap-1.5 font-medium text-foreground">
-                              <Package className="w-4 h-4" />
-                              {totalItems} unidades ({order.items.length} productos)
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2 bg-transparent"
-                            onClick={() => openDetail(order)}
-                          >
-                            <Eye className="w-4 h-4" />
-                            Ver Detalle
-                          </Button>
-                          <Select
-                            value={order.status}
-                            onValueChange={(value) =>
-                              handleStatusChange(order.id, value)
-                            }
-                          >
-                            <SelectTrigger className="w-44">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {statusOptions.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Info row */}
-                    <div className="p-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Dirección de Envío</p>
-                        <p className="text-sm font-medium flex items-start gap-1.5">
-                          <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-muted-foreground" />
-                          {order.clientAddress}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Teléfono</p>
-                        <p className="text-sm font-medium flex items-center gap-1.5">
-                          <Phone className="w-4 h-4 text-muted-foreground" />
-                          {order.clientPhone}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Vendedor</p>
-                        <p className="text-sm font-medium">{order.sellerName}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Total</p>
-                        <p className="text-lg font-bold text-primary">{formatCurrency(order.total)}</p>
-                      </div>
-                    </div>
-
-                    {/* Products table */}
-                    <div className="px-4 pb-4">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>SKU</TableHead>
-                            <TableHead>Producto</TableHead>
-                            <TableHead className="text-center">Cantidad</TableHead>
-                            <TableHead className="text-right">Precio Unit.</TableHead>
-                            <TableHead className="text-right">Subtotal</TableHead>
+                            </TableCell>
+                            <TableCell className="text-right">{formatCurrency(item.price)}</TableCell>
+                            <TableCell className="text-right font-medium">
+                              {formatCurrency(item.price * item.quantity)}
+                            </TableCell>
                           </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {order.items.map((item, idx) => (
-                            <TableRow key={idx}>
-                              <TableCell className="font-mono text-xs">{item.sku}</TableCell>
-                              <TableCell className="font-medium">{item.productName}</TableCell>
-                              <TableCell className="text-center">
-                                <Badge variant="secondary" className="font-bold">
-                                  x{item.quantity}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right">{formatCurrency(item.price)}</TableCell>
-                              <TableCell className="text-right font-medium">
-                                {formatCurrency(item.price * item.quantity)}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
 
-                    {/* Notes if any */}
-                    {order.notes && (
-                      <div className="px-4 pb-4">
-                        <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg">
-                          <p className="text-sm flex items-start gap-2">
-                            <MessageSquare className="w-4 h-4 mt-0.5 text-warning shrink-0" />
-                            <span><strong>Nota:</strong> {order.notes}</span>
-                          </p>
-                        </div>
+                  {/* Notes if any */}
+                  {order.notes && (
+                    <div className="px-4 pb-4">
+                      <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg">
+                        <p className="text-sm flex items-start gap-2">
+                          <MessageSquare className="w-4 h-4 mt-0.5 text-warning shrink-0" />
+                          <span><strong>Nota:</strong> {order.notes}</span>
+                        </p>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })
-          )}
-        </div>
-      )}
-
-      {/* Kanban View */}
-      {viewMode === "kanban" && (
-        <div className="grid gap-4 md:grid-cols-3">
-          {/* En Preparación Column */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 px-3 py-2 bg-secondary rounded-lg">
-              <Package className="w-5 h-5" />
-              <span className="font-medium">En Preparación</span>
-              <Badge variant="secondary" className="ml-auto">
-                {ordersByStatus.preparacion.length}
-              </Badge>
-            </div>
-            {ordersByStatus.preparacion.map((order) => {
-              const totalItems = getTotalItems(order.items);
-              return (
-                <Card key={order.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="pt-4 pb-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-bold">{order.id}</span>
-                      {order.facturaA && (
-                        <Badge variant="outline" className="border-primary text-primary text-xs">
-                          Fact. A
-                        </Badge>
-                      )}
                     </div>
-                    <p className="text-sm font-medium mb-1">{order.clientName}</p>
-                    <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-                      <MapPin className="w-3 h-3" />
-                      {order.clientAddress}
-                    </p>
-                    <div className="flex items-center justify-between mb-3 text-sm">
-                      <span className="text-muted-foreground">
-                        {totalItems} unidades
-                      </span>
-                      <span className="font-bold">{formatCurrency(order.total)}</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 bg-transparent"
-                        onClick={() => openDetail(order)}
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="flex-1 gap-1"
-                        onClick={() => handleStatusChange(order.id, "enviado")}
-                      >
-                        Enviado
-                        <ArrowRight className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-
-          {/* Enviado Column */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 rounded-lg">
-              <Truck className="w-5 h-5 text-primary" />
-              <span className="font-medium">Enviado</span>
-              <Badge variant="secondary" className="ml-auto">
-                {ordersByStatus.enviado.length}
-              </Badge>
-            </div>
-            {ordersByStatus.enviado.map((order) => {
-              const totalItems = getTotalItems(order.items);
-              return (
-                <Card key={order.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="pt-4 pb-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-bold">{order.id}</span>
-                      {order.facturaA && (
-                        <Badge variant="outline" className="border-primary text-primary text-xs">
-                          Fact. A
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-sm font-medium mb-1">{order.clientName}</p>
-                    <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-                      <MapPin className="w-3 h-3" />
-                      {order.clientAddress}
-                    </p>
-                    <div className="flex items-center justify-between mb-3 text-sm">
-                      <span className="text-muted-foreground">
-                        {totalItems} unidades
-                      </span>
-                      <span className="font-bold">{formatCurrency(order.total)}</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 bg-transparent"
-                        onClick={() => openDetail(order)}
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 gap-1 bg-transparent"
-                        onClick={() => handleStatusChange(order.id, "entregado")}
-                      >
-                        Entregado
-                        <CheckCircle2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-
-          {/* Entregado Column */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 px-3 py-2 bg-success/10 rounded-lg">
-              <CheckCircle2 className="w-5 h-5 text-success" />
-              <span className="font-medium">Entregado</span>
-              <Badge variant="secondary" className="ml-auto">
-                {ordersByStatus.entregado.length}
-              </Badge>
-            </div>
-            {ordersByStatus.entregado.map((order) => {
-              const totalItems = getTotalItems(order.items);
-              return (
-                <Card key={order.id} className="opacity-75">
-                  <CardContent className="pt-4 pb-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-bold">{order.id}</span>
-                      {order.facturaA && (
-                        <Badge variant="outline" className="border-primary text-primary text-xs">
-                          Fact. A
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-sm font-medium mb-1">{order.clientName}</p>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        {totalItems} unidades
-                      </span>
-                      <span className="font-bold">{formatCurrency(order.total)}</span>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="w-full mt-2"
-                      onClick={() => openDetail(order)}
-                    >
-                      <Eye className="w-4 h-4 mr-1" />
-                      Ver Detalle
-                    </Button>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      )}
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
+      </div>
 
       {/* Order Detail Modal */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
@@ -518,7 +373,7 @@ export default function DespachosPage() {
               )}
             </DialogTitle>
           </DialogHeader>
-          
+
           {selectedOrder && (
             <div className="space-y-6 mt-4">
               {/* Client Info */}

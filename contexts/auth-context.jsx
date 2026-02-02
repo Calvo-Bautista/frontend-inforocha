@@ -12,6 +12,7 @@ const MOCK_USERS = [
     password: "123456",
     name: "Carlos Vendedor",
     role: "vendedor",
+    legajo: "LEG-001",
   },
   {
     id: 2,
@@ -19,6 +20,7 @@ const MOCK_USERS = [
     password: "123456",
     name: "María Logística",
     role: "logistica",
+    legajo: "LEG-002",
   },
   {
     id: 3,
@@ -26,6 +28,15 @@ const MOCK_USERS = [
     password: "123456",
     name: "Admin Rocha",
     role: "admin",
+    legajo: "LEG-003",
+  },
+  {
+    id: 5,
+    email: "owner@rocha.com",
+    password: "123456",
+    name: "Owner Rocha",
+    role: "owner",
+    legajo: "LEG-000",
   },
 ];
 

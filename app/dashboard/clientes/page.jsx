@@ -84,7 +84,8 @@ export default function ClientesPage() {
       const matchesSearch =
         client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         client.phone.includes(searchTerm) ||
-        client.address.toLowerCase().includes(searchTerm.toLowerCase());
+        client.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (client.legajo && client.legajo.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesStatus =
         statusFilter === "all" || client.status === statusFilter;
       return matchesSearch && matchesStatus;
@@ -303,6 +304,7 @@ export default function ClientesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Legajo</TableHead>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Teléfono</TableHead>
                     <TableHead>Máquinas</TableHead>
@@ -319,6 +321,11 @@ export default function ClientesPage() {
                     const clientLogs = getClientLogs(client.id);
                     return (
                       <TableRow key={client.id}>
+                        <TableCell>
+                          <span className="font-mono text-sm text-muted-foreground">
+                            {client.legajo || "-"}
+                          </span>
+                        </TableCell>
                         <TableCell>
                           <div>
                             <p className="font-medium">{client.name}</p>
