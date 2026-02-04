@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { systemUsers } from "@/lib/mock-data";
+import { useState, useEffect } from "react";
+import { usersAPI } from "@/lib/api";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -85,7 +86,9 @@ const roleLabels = {
 };
 
 export default function UsuariosPage() {
-  const [users, setUsers] = useState(systemUsers);
+  const [users, setUsers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -98,6 +101,27 @@ export default function UsuariosPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Fetch users from API
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setIsLoading(true);
+        const data = await usersAPI.getAll();
+        setUsers(data);
+      } catch (err) {
+        console.error("Error fetching users:", err);
+        setError(err.message);
+        toast.error("Error al cargar usuarios", {
+          description: err.message,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
 
   const [newUser, setNewUser] = useState({
     name: "",
@@ -142,22 +166,33 @@ export default function UsuariosPage() {
     e.preventDefault();
     setIsSubmitting(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      const userData = {
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+        legajo: generateLegajo(),
+        password: newUser.password,
+      };
 
-    const user = {
-      id: users.length + 1,
-      name: newUser.name,
-      email: newUser.email,
-      role: newUser.role,
-      legajo: generateLegajo(),
-      createdAt: new Date().toISOString().split("T")[0],
-    };
+      const createdUser = await usersAPI.create(userData);
+      setUsers((prev) => [...prev, createdUser]);
 
-    setUsers((prev) => [...prev, user]);
-    setIsSubmitting(false);
-    setIsCreateOpen(false);
-    setNewUser({ name: "", email: "", role: "", password: "" });
-    setShowPassword(false);
+      toast.success("Usuario creado", {
+        description: `${createdUser.name} ha sido agregado al sistema`,
+      });
+
+      setIsCreateOpen(false);
+      setNewUser({ name: "", email: "", role: "", password: "" });
+      setShowPassword(false);
+    } catch (err) {
+      console.error("Error creating user:", err);
+      toast.error("Error al crear usuario", {
+        description: err.message,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleEditUser = async (e) => {
@@ -166,19 +201,28 @@ export default function UsuariosPage() {
 
     setIsSubmitting(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      const updatedUser = await usersAPI.update(userToEdit.id, editUser);
 
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.id === userToEdit.id
-          ? { ...u, name: editUser.name, email: editUser.email, role: editUser.role }
-          : u
-      )
-    );
-    setIsSubmitting(false);
-    setIsEditOpen(false);
-    setUserToEdit(null);
-    setEditUser({ name: "", email: "", role: "" });
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userToEdit.id ? updatedUser : u))
+      );
+
+      toast.success("Usuario actualizado", {
+        description: `${updatedUser.name} ha sido actualizado`,
+      });
+
+      setIsEditOpen(false);
+      setUserToEdit(null);
+      setEditUser({ name: "", email: "", role: "" });
+    } catch (err) {
+      console.error("Error updating user:", err);
+      toast.error("Error al actualizar usuario", {
+        description: err.message,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChangePassword = async (e) => {
@@ -186,25 +230,37 @@ export default function UsuariosPage() {
     if (!userToChangePassword) return;
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      alert("Las contraseñas no coinciden");
+      toast.error("Las contraseñas no coinciden");
       return;
     }
 
     if (passwordData.newPassword.length < 6) {
-      alert("La contraseña debe tener al menos 6 caracteres");
+      toast.error("La contraseña debe tener al menos 6 caracteres");
       return;
     }
 
     setIsSubmitting(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      await usersAPI.changePassword(userToChangePassword.id, passwordData.newPassword);
 
-    setIsSubmitting(false);
-    setIsPasswordOpen(false);
-    setUserToChangePassword(null);
-    setPasswordData({ newPassword: "", confirmPassword: "" });
-    setShowNewPassword(false);
-    setShowConfirmPassword(false);
+      toast.success("Contraseña actualizada", {
+        description: `La contraseña de ${userToChangePassword.name} ha sido cambiada`,
+      });
+
+      setIsPasswordOpen(false);
+      setUserToChangePassword(null);
+      setPasswordData({ newPassword: "", confirmPassword: "" });
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
+    } catch (err) {
+      console.error("Error changing password:", err);
+      toast.error("Error al cambiar contraseña", {
+        description: err.message,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDeleteUser = async () => {
@@ -212,12 +268,25 @@ export default function UsuariosPage() {
 
     setIsSubmitting(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    try {
+      await usersAPI.delete(userToDelete.id);
 
-    setUsers((prev) => prev.filter((u) => u.id !== userToDelete.id));
-    setIsSubmitting(false);
-    setIsDeleteOpen(false);
-    setUserToDelete(null);
+      setUsers((prev) => prev.filter((u) => u.id !== userToDelete.id));
+
+      toast.success("Usuario eliminado", {
+        description: `${userToDelete.name} ha sido eliminado del sistema`,
+      });
+
+      setIsDeleteOpen(false);
+      setUserToDelete(null);
+    } catch (err) {
+      console.error("Error deleting user:", err);
+      toast.error("Error al eliminar usuario", {
+        description: err.message,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const openEditDialog = (user) => {
@@ -245,6 +314,14 @@ export default function UsuariosPage() {
   const logisticos = users.filter((u) => u.role === "logistica").length;
   const admins = users.filter((u) => u.role === "admin").length;
   const owners = users.filter((u) => u.role === "owner").length;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

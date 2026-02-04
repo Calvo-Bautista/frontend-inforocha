@@ -1,74 +1,62 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { authAPI } from "@/lib/api";
 
 const AuthContext = createContext(null);
 
-// Mock users for demonstration
-const MOCK_USERS = [
-  {
-    id: 1,
-    email: "vendedor@rocha.com",
-    password: "123456",
-    name: "Carlos Vendedor",
-    role: "vendedor",
-    legajo: "LEG-001",
-  },
-  {
-    id: 2,
-    email: "logistica@rocha.com",
-    password: "123456",
-    name: "María Logística",
-    role: "logistica",
-    legajo: "LEG-002",
-  },
-  {
-    id: 3,
-    email: "admin@rocha.com",
-    password: "123456",
-    name: "Admin Rocha",
-    role: "admin",
-    legajo: "LEG-003",
-  },
-  {
-    id: 5,
-    email: "owner@rocha.com",
-    password: "123456",
-    name: "Owner Rocha",
-    role: "owner",
-    legajo: "LEG-000",
-  },
-];
-
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Check for existing session on mount
+  useEffect(() => {
+    const initAuth = async () => {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+
+      if (token) {
+        try {
+          // Verify token is still valid by fetching user data
+          const userData = await authAPI.getMe();
+          setUser(userData);
+        } catch (err) {
+          // Token is invalid or expired
+          console.error('Session validation failed:', err);
+          authAPI.logout();
+        }
+      }
+
+      setIsLoading(false);
+    };
+
+    initAuth();
+  }, []);
 
   const login = useCallback(async (email, password) => {
     setIsLoading(true);
     setError(null);
 
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    try {
+      // Call real login API
+      const { access_token } = await authAPI.login(email, password);
 
-    const foundUser = MOCK_USERS.find(
-      (u) => u.email === email && u.password === password
-    );
+      // Fetch user data after successful login
+      const userData = await authAPI.getMe();
 
-    if (foundUser) {
-      const { password: _, ...userWithoutPassword } = foundUser;
-      setUser(userWithoutPassword);
+      setUser(userData);
       setIsLoading(false);
       return true;
-    } else {
-      setError("Credenciales inválidas. Por favor, intente de nuevo.");
+    } catch (err) {
+      console.error('Login error:', err);
+      setError(err.message || "Credenciales inválidas. Por favor, intente de nuevo.");
       setIsLoading(false);
       return false;
     }
   }, []);
 
   const logout = useCallback(() => {
+    authAPI.logout();
     setUser(null);
     setError(null);
   }, []);

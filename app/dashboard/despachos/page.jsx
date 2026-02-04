@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { orders, formatCurrency, getOrderStatus } from "@/lib/mock-data";
+import { useState, useMemo, useEffect } from "react";
+import { formatCurrency, getOrderStatus } from "@/lib/mock-data";
+import { ordersAPI } from "@/lib/api";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -63,11 +65,32 @@ const statusOptions = [
 ];
 
 export default function DespachosPage() {
-  const [ordersList, setOrdersList] = useState(orders);
+  const [ordersList, setOrdersList] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  // Fetch orders from API (excluding pending)
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        setIsLoading(true);
+        const data = await ordersAPI.getAll();
+        // Filter out pending orders on client side
+        setOrdersList(data.filter(o => o.status !== "pendiente"));
+      } catch (err) {
+        console.error("Error fetching orders:", err);
+        toast.error("Error al cargar órdenes", {
+          description: err.message,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchOrders();
+  }, []);
 
   const shippableOrders = useMemo(() => {
     return ordersList.filter((o) => o.status !== "pendiente");
@@ -81,12 +104,21 @@ export default function DespachosPage() {
     });
   }, [shippableOrders, searchTerm, statusFilter]);
 
-  const handleStatusChange = (orderId, newStatus) => {
-    setOrdersList((prev) =>
-      prev.map((order) =>
-        order.id === orderId ? { ...order, status: newStatus } : order
-      )
-    );
+  const handleStatusChange = async (orderId, newStatus) => {
+    try {
+      await ordersAPI.update(orderId, { status: newStatus });
+      setOrdersList((prev) =>
+        prev.map((order) =>
+          order.id === orderId ? { ...order, status: newStatus } : order
+        )
+      );
+      toast.success("Estado actualizado exitosamente");
+    } catch (err) {
+      console.error("Error updating order status:", err);
+      toast.error("Error al actualizar estado", {
+        description: err.message,
+      });
+    }
   };
 
   const ordersByStatus = useMemo(() => {

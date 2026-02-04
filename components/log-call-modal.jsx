@@ -45,13 +45,12 @@ export function LogCallModal({ client, open, onOpenChange, onSubmit }) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     const callLog = {
-      clientId: client.id,
-      clientName: client.name,
-      date: format(formData.date, "yyyy-MM-dd"),
+      client_id: client.id,
+      call_date: format(formData.date, "yyyy-MM-dd"),
       industry: formData.industry,
-      usesPrinters: formData.usesPrinters === "yes",
-      printerType: formData.printerType,
-      interestedInQuote: formData.interestedInQuote === "yes",
+      uses_printers: formData.usesPrinters === "yes",
+      printer_type: formData.printerType,
+      interested_in_quote: formData.interestedInQuote === "yes",
       notes: formData.notes,
     };
 

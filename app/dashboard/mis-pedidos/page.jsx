@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { orders, formatCurrency, getOrderStatus } from "@/lib/mock-data";
+import { useState, useMemo, useEffect } from "react";
+import { formatCurrency, getOrderStatus } from "@/lib/mock-data";
+import { ordersAPI } from "@/lib/api";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -37,20 +39,43 @@ const statusColorMap = {
 };
 
 export default function MisPedidosPage() {
+  const [orders, setOrders] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const searchParams = useSearchParams();
 
+  // Fetch orders from API
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        setIsLoading(true);
+        const params = {};
+        if (statusFilter !== "all") {
+          params.status = statusFilter;
+        }
+        const data = await ordersAPI.getAll(params);
+        setOrders(data);
+      } catch (err) {
+        console.error("Error fetching orders:", err);
+        toast.error("Error al cargar pedidos", {
+          description: err.message,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchOrders();
+  }, [statusFilter]);
+
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       const matchesSearch =
-        order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.clientName.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus =
-        statusFilter === "all" || order.status === statusFilter;
-      return matchesSearch && matchesStatus;
+        order.order_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.client?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesSearch;
     });
-  }, [searchTerm, statusFilter]);
+  }, [orders, searchTerm]);
 
   const statusFilters = [
     { value: "all", label: "Todos" },

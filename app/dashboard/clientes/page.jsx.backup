@@ -355,24 +355,7 @@ export default function ClientesPage() {
                       }
                       placeholder="Ej: Suministros BA"
                     />
-                  </div>                <div className="grid gap-2">
-                    <Label htmlFor="status">Estado *</Label>
-                    <Select
-                      value={newContact.status}
-                      onValueChange={(value) =>
-                        setNewContact((prev) => ({ ...prev, status: value }))
-                      }
-                    >
-                      <SelectTrigger id="edit-status">
-                        <SelectValue placeholder="Seleccionar estado..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="prospect">Prospecto</SelectItem>
-                        <SelectItem value="active">Cliente Activo</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
-
                 </div>
               </div>
               <DialogFooter>
@@ -479,24 +462,7 @@ export default function ClientesPage() {
                         setEditContact((prev) => ({ ...prev, proveedorActual: e.target.value }))
                       }
                     />
-                  </div>                <div className="grid gap-2">
-                    <Label htmlFor="edit-status">Estado *</Label>
-                    <Select
-                      value={editContact.status}
-                      onValueChange={(value) =>
-                        setEditContact((prev) => ({ ...prev, status: value }))
-                      }
-                    >
-                      <SelectTrigger id="edit-status">
-                        <SelectValue placeholder="Seleccionar estado..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="prospect">Prospecto</SelectItem>
-                        <SelectItem value="active">Cliente Activo</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
-
                 </div>
               </div>
               <DialogFooter>
@@ -569,7 +535,7 @@ export default function ClientesPage() {
                 <TableBody>
                   {filteredClients.map((client) => {
                     const clientStatus = getClientStatus(client.status);
-                    const clientPriority = getClientPriority(client.tipo_cliente);
+                    const clientPriority = getClientPriority(client.tipoCliente);
                     const clientLogs = getClientLogs(client.id);
                     return (
                       <TableRow key={client.id}>
@@ -601,7 +567,7 @@ export default function ClientesPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          {client.tipo_cliente ? (
+                          {client.tipoCliente ? (
                             <Badge className={statusColorMap[clientPriority.color]}>
                               {clientPriority.label}
                             </Badge>
@@ -611,7 +577,7 @@ export default function ClientesPage() {
                         </TableCell>
                         <TableCell>
                           <span className="text-sm">
-                            {client.proveedor_actual || "-"}
+                            {client.proveedorActual || "-"}
                           </span>
                         </TableCell>
                         <TableCell>

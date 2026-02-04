@@ -2,7 +2,9 @@
 
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { clients, products, formatCurrency } from "@/lib/mock-data";
+import { clientsAPI, productsAPI, ordersAPI } from "@/lib/api";
+import { formatCurrency } from "@/lib/mock-data";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,9 +64,38 @@ export default function NuevaOrdenPage() {
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
 
+  // Data from API
+  const [clients, setClients] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+
   // Refs for click outside
   const clientDropdownRef = useRef(null);
   const productDropdownRef = useRef(null);
+
+  // Fetch clients and products on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoadingData(true);
+        const [clientsData, productsData] = await Promise.all([
+          clientsAPI.getAll({ status: 'active' }),
+          productsAPI.getAll(),
+        ]);
+        setClients(clientsData);
+        setProducts(productsData);
+      } catch (err) {
+        console.error("Error fetching data:", err);
+        toast.error("Error al cargar datos", {
+          description: err.message,
+        });
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const selectedClient = clients.find((c) => c.id.toString() === selectedClientId);
   const selectedProduct = products.find((p) => p.id.toString() === selectedProductId);
@@ -187,16 +218,41 @@ export default function NuevaOrdenPage() {
 
     setIsSubmitting(true);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      const orderData = {
+        client_id: parseInt(selectedClientId),
+        items: cartItems.map(item => ({
+          product_id: item.productId,
+          quantity: item.quantity,
+          price_at_time: item.price,
+        })),
+        subtotal: cartSubtotal,
+        discount: discountAmount,
+        discount_percent: applyDiscount ? availableDiscountPercent : 0,
+        shipping: waiveShipping ? 0 : SHIPPING_COST,
+        shipping_discount: waiveShipping,
+        total: cartTotal,
+        factura_a: wantsFacturaA,
+        notes: orderNotes || null,
+      };
 
-    setIsSubmitting(false);
-    setShowSuccess(true);
+      await ordersAPI.create(orderData);
 
-    // Reset form and redirect after success
-    setTimeout(() => {
-      router.push("/dashboard/mis-pedidos");
-    }, 2000);
+      toast.success("Orden creada exitosamente");
+      setShowSuccess(true);
+
+      // Reset form and redirect after success
+      setTimeout(() => {
+        router.push("/dashboard/mis-pedidos");
+      }, 2000);
+    } catch (err) {
+      console.error("Error creating order:", err);
+      toast.error("Error al crear orden", {
+        description: err.message,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const canSubmit = selectedClient && cartItems.length > 0 && !isSubmitting;
