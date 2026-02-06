@@ -26,6 +26,7 @@ import {
   User,
   Package,
   TrendingUp,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
@@ -67,6 +68,13 @@ export default function MisPedidosPage() {
     };
     fetchOrders();
   }, [statusFilter]);
+
+  // Debug: log first order to see structure
+  useEffect(() => {
+    if (orders.length > 0) {
+      console.log('First order data:', orders[0]);
+    }
+  }, [orders]);
 
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
@@ -181,7 +189,7 @@ export default function MisPedidosPage() {
               <CardHeader className="pb-2">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div className="flex items-center gap-3">
-                    <CardTitle className="text-lg">{order.id}</CardTitle>
+                    <CardTitle className="text-lg">{order.order_number || `#${order.id}`}</CardTitle>
                     <Badge className={statusColorMap[orderStatus.color]}>
                       {orderStatus.label}
                     </Badge>
@@ -193,11 +201,11 @@ export default function MisPedidosPage() {
                 <CardDescription className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-1">
                   <span className="flex items-center gap-1.5">
                     <User className="w-4 h-4" />
-                    {order.clientName}
+                    {order.client?.name || `Cliente #${order.client_id}`}
                   </span>
                   <span className="flex items-center gap-1.5">
                     <Calendar className="w-4 h-4" />
-                    {new Date(order.date).toLocaleDateString("es-AR", {
+                    {new Date(order.order_date).toLocaleDateString("es-AR", {
                       day: "numeric",
                       month: "long",
                       year: "numeric",
@@ -223,14 +231,14 @@ export default function MisPedidosPage() {
                           >
                             <div>
                               <p className="font-medium text-sm">
-                                {item.productName}
+                                {item.product?.name || `Producto #${item.product_id}`}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                {formatCurrency(item.price)} x {item.quantity}
+                                {formatCurrency(item.price_at_time)} x {item.quantity}
                               </p>
                             </div>
                             <p className="font-medium">
-                              {formatCurrency(item.price * item.quantity)}
+                              {formatCurrency(item.price_at_time * item.quantity)}
                             </p>
                           </div>
                         ))}
@@ -238,6 +246,24 @@ export default function MisPedidosPage() {
                     </AccordionContent>
                   </AccordionItem>
                 </Accordion>
+
+                {/* Notes and Factura A */}
+                {(order.notes || order.factura_a) && (
+                  <div className="mt-3 pt-3 border-t border-border space-y-2">
+                    {order.factura_a && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <FileText className="w-4 h-4 text-primary" />
+                        <span className="font-medium">Requiere Factura A</span>
+                      </div>
+                    )}
+                    {order.notes && (
+                      <div className="text-sm">
+                        <p className="font-medium text-muted-foreground mb-1">Notas:</p>
+                        <p className="text-foreground">{order.notes}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           );

@@ -221,6 +221,7 @@ export default function NuevaOrdenPage() {
     try {
       const orderData = {
         client_id: parseInt(selectedClientId),
+        order_date: new Date().toISOString().split('T')[0], // Format: YYYY-MM-DD
         items: cartItems.map(item => ({
           product_id: item.productId,
           quantity: item.quantity,
