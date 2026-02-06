@@ -95,7 +95,8 @@ export default function MisPedidosPage() {
 
   // Stats
   const totalOrders = orders.length;
-  const totalRevenue = orders.reduce((sum, o) => sum + o.total, 0);
+  // Calculate revenue based on currently filtered orders
+  const filteredRevenue = filteredOrders.reduce((sum, o) => sum + Number(o.total), 0);
   const pendingOrders = orders.filter((o) => o.status === "pendiente").length;
 
   return (
@@ -130,8 +131,8 @@ export default function MisPedidosPage() {
                 <TrendingUp className="w-6 h-6 text-success" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{formatCurrency(totalRevenue)}</p>
-                <p className="text-sm text-muted-foreground">Ventas Totales</p>
+                <p className="text-2xl font-bold">{formatCurrency(filteredRevenue)}</p>
+                <p className="text-sm text-muted-foreground">Total Vendido</p>
               </div>
             </div>
           </CardContent>
