@@ -59,6 +59,7 @@ const statusColorMap = {
 };
 
 const statusOptions = [
+  { value: "pendiente", label: "Pendiente" },
   { value: "preparacion", label: "En Preparación" },
   { value: "enviado", label: "Enviado" },
   { value: "entregado", label: "Entregado" },
@@ -72,14 +73,13 @@ export default function DespachosPage() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-  // Fetch orders from API (excluding pending)
+  // Fetch orders from API
   useEffect(() => {
     const fetchOrders = async () => {
       try {
         setIsLoading(true);
         const data = await ordersAPI.getAll();
-        // Filter out pending orders on client side
-        setOrdersList(data.filter(o => o.status !== "pendiente"));
+        setOrdersList(data);
       } catch (err) {
         console.error("Error fetching orders:", err);
         toast.error("Error al cargar órdenes", {
@@ -93,12 +93,12 @@ export default function DespachosPage() {
   }, []);
 
   const shippableOrders = useMemo(() => {
-    return ordersList.filter((o) => o.status !== "pendiente");
+    return ordersList;
   }, [ordersList]);
 
   const filteredOrders = useMemo(() => {
     return shippableOrders.filter((order) => {
-      const matchesSearch = order.id.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = String(order.id).toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === "all" || order.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
@@ -123,12 +123,14 @@ export default function DespachosPage() {
 
   const ordersByStatus = useMemo(() => {
     return {
+      pendiente: shippableOrders.filter((o) => o.status === "pendiente"),
       preparacion: shippableOrders.filter((o) => o.status === "preparacion"),
       enviado: shippableOrders.filter((o) => o.status === "enviado"),
       entregado: shippableOrders.filter((o) => o.status === "entregado"),
     };
   }, [shippableOrders]);
 
+  const pending = ordersByStatus.pendiente.length;
   const inPreparation = ordersByStatus.preparacion.length;
   const shipped = ordersByStatus.enviado.length;
   const delivered = ordersByStatus.entregado.length;
@@ -139,11 +141,13 @@ export default function DespachosPage() {
   };
 
   const getTotalItems = (items) => {
+    if (!items) return 0;
     return items.reduce((acc, item) => acc + item.quantity, 0);
   };
 
   const statusFilters = [
     { value: "all", label: "Todas las Órdenes" },
+    { value: "pendiente", label: "Pendientes" },
     { value: "preparacion", label: "En Preparación" },
     { value: "enviado", label: "Enviado" },
     { value: "entregado", label: "Entregado" },
@@ -189,7 +193,20 @@ export default function DespachosPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-secondary rounded-lg">
+                <Receipt className="w-6 h-6 text-secondary-foreground" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{pending}</p>
+                <p className="text-sm text-muted-foreground">Pendientes</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
@@ -259,11 +276,11 @@ export default function DespachosPage() {
                     <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <h3 className="font-bold text-lg">{order.id}</h3>
+                          <h3 className="font-bold text-lg">{order.order_number || order.id}</h3>
                           <Badge className={statusColorMap[orderStatus.color]}>
                             {orderStatus.label}
                           </Badge>
-                          {order.facturaA && (
+                          {order.factura_a && (
                             <Badge variant="outline" className="border-primary text-primary">
                               <FileText className="w-3 h-3 mr-1" />
                               Factura A
@@ -273,11 +290,11 @@ export default function DespachosPage() {
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1.5">
                             <User className="w-4 h-4" />
-                            {order.clientName}
+                            {order.client?.name || "Sin cliente"}
                           </span>
                           <span className="flex items-center gap-1.5">
                             <Calendar className="w-4 h-4" />
-                            {new Date(order.date).toLocaleDateString("es-AR")}
+                            {order.created_at ? new Date(order.created_at).toLocaleDateString("es-AR") : "N/A"}
                           </span>
                           <span className="flex items-center gap-1.5 font-medium text-foreground">
                             <Package className="w-4 h-4" />
@@ -322,19 +339,19 @@ export default function DespachosPage() {
                       <p className="text-xs text-muted-foreground mb-1">Dirección de Envío</p>
                       <p className="text-sm font-medium flex items-start gap-1.5">
                         <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-muted-foreground" />
-                        {order.clientAddress}
+                        {order.client?.address || "Sin dirección"}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground mb-1">Teléfono</p>
                       <p className="text-sm font-medium flex items-center gap-1.5">
                         <Phone className="w-4 h-4 text-muted-foreground" />
-                        {order.clientPhone}
+                        {order.client?.phone || "Sin teléfono"}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground mb-1">Vendedor</p>
-                      <p className="text-sm font-medium">{order.sellerName}</p>
+                      <p className="text-sm font-medium">{order.seller?.name || "Desconocido"}</p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground mb-1">Total</p>
@@ -357,16 +374,16 @@ export default function DespachosPage() {
                       <TableBody>
                         {order.items.map((item, idx) => (
                           <TableRow key={idx}>
-                            <TableCell className="font-mono text-xs">{item.sku}</TableCell>
-                            <TableCell className="font-medium">{item.productName}</TableCell>
+                            <TableCell className="font-mono text-xs">{item.product?.sku || "N/A"}</TableCell>
+                            <TableCell className="font-medium">{item.product?.name || "Producto Eliminado"}</TableCell>
                             <TableCell className="text-center">
                               <Badge variant="secondary" className="font-bold">
                                 x{item.quantity}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-right">{formatCurrency(item.price)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(item.price_at_time)}</TableCell>
                             <TableCell className="text-right font-medium">
-                              {formatCurrency(item.price * item.quantity)}
+                              {formatCurrency(item.price_at_time * item.quantity)}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -397,7 +414,7 @@ export default function DespachosPage() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
-              <span>Detalle del Pedido {selectedOrder?.id}</span>
+              <span>Detalle del Pedido {selectedOrder?.order_number || selectedOrder?.id}</span>
               {selectedOrder && (
                 <Badge className={statusColorMap[getOrderStatus(selectedOrder.status).color]}>
                   {getOrderStatus(selectedOrder.status).label}
@@ -417,14 +434,14 @@ export default function DespachosPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    <p className="font-semibold text-lg">{selectedOrder.clientName}</p>
+                    <p className="font-semibold text-lg">{selectedOrder.client?.name || "Sin Nombre"}</p>
                     <p className="text-sm flex items-center gap-2">
                       <Phone className="w-4 h-4 text-muted-foreground" />
-                      {selectedOrder.clientPhone}
+                      {selectedOrder.client?.phone || "Sin Teléfono"}
                     </p>
                     <p className="text-sm flex items-start gap-2">
                       <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
-                      {selectedOrder.clientAddress}
+                      {selectedOrder.client?.address || "Sin Dirección"}
                     </p>
                   </CardContent>
                 </Card>
@@ -438,19 +455,19 @@ export default function DespachosPage() {
                   <CardContent className="space-y-2">
                     <p className="text-sm flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-muted-foreground" />
-                      {new Date(selectedOrder.date).toLocaleDateString("es-AR", {
+                      {selectedOrder.created_at ? new Date(selectedOrder.created_at).toLocaleDateString("es-AR", {
                         weekday: "long",
                         year: "numeric",
                         month: "long",
                         day: "numeric",
-                      })}
+                      }) : "Fecha inválida"}
                     </p>
                     <p className="text-sm flex items-center gap-2">
                       <User className="w-4 h-4 text-muted-foreground" />
-                      Vendedor: {selectedOrder.sellerName}
+                      Vendedor: {selectedOrder.seller?.name || "Desconocido"}
                     </p>
                     <div className="flex items-center gap-2">
-                      {selectedOrder.facturaA ? (
+                      {selectedOrder.factura_a ? (
                         <Badge className="bg-primary text-primary-foreground">
                           <FileText className="w-3 h-3 mr-1" />
                           Requiere Factura A
@@ -486,15 +503,15 @@ export default function DespachosPage() {
                     <TableBody>
                       {selectedOrder.items.map((item, idx) => (
                         <TableRow key={idx}>
-                          <TableCell className="font-mono text-xs">{item.sku}</TableCell>
-                          <TableCell className="font-medium">{item.productName}</TableCell>
+                          <TableCell className="font-mono text-xs">{item.product?.sku || "N/A"}</TableCell>
+                          <TableCell className="font-medium">{item.product?.name || "Eliminado"}</TableCell>
                           <TableCell className="text-center">
                             <Badge variant="secondary" className="font-bold text-base">
                               {item.quantity}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            {formatCurrency(item.price * item.quantity)}
+                            {formatCurrency(item.price_at_time * item.quantity)}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -517,18 +534,18 @@ export default function DespachosPage() {
                       <span className="text-muted-foreground">Subtotal:</span>
                       <span>{formatCurrency(selectedOrder.subtotal)}</span>
                     </div>
-                    {selectedOrder.discountPercent > 0 && (
+                    {selectedOrder.discount_percent > 0 && (
                       <div className="flex justify-between text-sm text-success">
                         <span className="flex items-center gap-1">
                           <Percent className="w-3 h-3" />
-                          Descuento ({selectedOrder.discountPercent}%):
+                          Descuento ({selectedOrder.discount_percent}%):
                         </span>
                         <span>-{formatCurrency(selectedOrder.discount)}</span>
                       </div>
                     )}
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Envío:</span>
-                      {selectedOrder.shippingDiscount ? (
+                      {selectedOrder.shipping_discount ? (
                         <span className="text-success">Bonificado</span>
                       ) : (
                         <span>{formatCurrency(selectedOrder.shipping)}</span>

@@ -259,7 +259,7 @@ export default function NuevaOrdenPage() {
         subtotal: cartSubtotal,
         discount: discountAmount,
         discount_percent: applyDiscount ? availableDiscountPercent : 0,
-        shipping: waiveShipping ? 0 : SHIPPING_COST,
+        shipping: waiveShipping ? 0 : shippingCost,
         shipping_discount: waiveShipping,
         total: cartTotal,
         factura_a: wantsFacturaA,
