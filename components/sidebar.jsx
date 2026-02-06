@@ -27,6 +27,7 @@ const roleNavItems = {
     { href: "/dashboard/mis-pedidos", label: "Mis Pedidos", icon: ClipboardList },
   ],
   logistica: [
+    { href: "/dashboard/clientes", label: "Compradores & Llamadas", icon: Users },
     { href: "/dashboard/despachos", label: "Despachos", icon: Truck },
   ],
   admin: [

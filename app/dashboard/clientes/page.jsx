@@ -38,6 +38,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -60,6 +70,7 @@ import {
   Printer,
   MoreHorizontal,
   Pencil,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
@@ -84,6 +95,8 @@ export default function ClientesPage() {
   const [isNewContactOpen, setIsNewContactOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [clientToEdit, setClientToEdit] = useState(null);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState(null);
   const [logs, setLogs] = useState([]);
   const searchParams = useSearchParams();
 
@@ -226,6 +239,33 @@ export default function ClientesPage() {
     } catch (err) {
       console.error("Error updating client:", err);
       toast.error("Error al actualizar cliente", {
+        description: err.message,
+      });
+    }
+  };
+
+  const confirmDelete = (client) => {
+    setClientToDelete(client);
+    setIsDeleteOpen(true);
+  };
+
+  const handleDeleteClient = async () => {
+    if (!clientToDelete) return;
+
+    try {
+      await clientsAPI.delete(clientToDelete.id);
+
+      setClients((prev) => prev.filter((c) => c.id !== clientToDelete.id));
+
+      toast.success("Cliente eliminado", {
+        description: `${clientToDelete.name} ha sido eliminado del sistema`,
+      });
+
+      setIsDeleteOpen(false);
+      setClientToDelete(null);
+    } catch (err) {
+      console.error("Error deleting client:", err);
+      toast.error("Error al eliminar cliente", {
         description: err.message,
       });
     }
@@ -666,6 +706,17 @@ export default function ClientesPage() {
                                 <Phone className="w-4 h-4 mr-2" />
                                 Registrar Llamada
                               </DropdownMenuItem>
+                              {(user?.role === "admin" || user?.role === "owner") && (
+                                <>
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={() => confirmDelete(client)}
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Eliminar
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -769,6 +820,32 @@ export default function ClientesPage() {
           onOpenChange={setIsModalOpen}
           onSubmit={handleCallSubmit}
         />
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Eliminar cliente?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {clientToDelete && (
+                  <>
+                    Estás a punto de eliminar a <strong>{clientToDelete.name}</strong>.
+                    Esta acción no se puede deshacer y se eliminarán todos los registros de llamadas asociados.
+                  </>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteClient}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div >
     </Suspense >
   );
