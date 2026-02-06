@@ -330,7 +330,7 @@ export default function UsuariosPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Usuarios</h1>
           <p className="text-muted-foreground">
-            Administra los usuarios del sistema
+            Administra los usuarios del sistema y modifica los parametros del sistema
           </p>
         </div>
         <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
