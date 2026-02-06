@@ -22,7 +22,7 @@ export default function DashboardPage() {
           router.replace("/dashboard/usuarios");
           break;
         case "owner":
-          router.replace("/dashboard/productos");
+          router.replace("/dashboard/usuarios");
           break;
         default:
           break;

@@ -2,13 +2,21 @@
 
 import { useAuth } from "@/contexts/auth-context";
 import { Sidebar } from "@/components/sidebar";
-import { LoginForm } from "@/components/login-form";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function DashboardLayout({ children }) {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
 
-  if (!user) {
-    return <LoginForm />;
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.replace("/");
+    }
+  }, [user, isLoading, router]);
+
+  if (isLoading || !user) {
+    return null;
   }
 
   return (

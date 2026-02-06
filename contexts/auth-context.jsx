@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { authAPI } from "@/lib/api";
+import { useRouter } from "next/navigation";
 
 const AuthContext = createContext(null);
 
@@ -9,6 +10,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const router = useRouter();
 
   // Check for existing session on mount
   useEffect(() => {
@@ -59,7 +61,8 @@ export function AuthProvider({ children }) {
     authAPI.logout();
     setUser(null);
     setError(null);
-  }, []);
+    router.replace("/");
+  }, [router]);
 
   return (
     <AuthContext.Provider value={{ user, login, logout, isLoading, error }}>
