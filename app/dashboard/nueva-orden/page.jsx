@@ -209,17 +209,21 @@ export default function NuevaOrdenPage() {
   // Determine available discount percentage based on subtotal
 
   const availableDiscountPercent = useMemo(() => {
-    if (!systemConfig) return 0;
+    if (!systemConfig || !systemConfig.discounts || !Array.isArray(systemConfig.discounts)) return 0;
 
-    // Cast strict numeric values to avoid string comparison issues
     const subtotal = Number(cartSubtotal);
-    const threshold1 = Number(systemConfig.discount_threshold_1);
-    const threshold2 = Number(systemConfig.discount_threshold_2);
-    const threshold3 = Number(systemConfig.discount_threshold_3);
 
-    if (subtotal >= threshold3) return Number(systemConfig.discount_percentage_3);
-    if (subtotal >= threshold2) return Number(systemConfig.discount_percentage_2);
-    if (subtotal >= threshold1) return Number(systemConfig.discount_percentage_1);
+    // Sort discounts by threshold descending to find the highest applicable one first
+    const sortedDiscounts = [...systemConfig.discounts]
+      .map(d => ({ ...d, threshold: Number(d.threshold), percentage: Number(d.percentage) }))
+      .sort((a, b) => b.threshold - a.threshold);
+
+    for (const discount of sortedDiscounts) {
+      if (subtotal >= discount.threshold) {
+        return discount.percentage;
+      }
+    }
+
     return 0;
   }, [cartSubtotal, systemConfig]);
 
