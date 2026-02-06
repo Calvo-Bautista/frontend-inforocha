@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { createClientSchema, editClientSchema } from "@/lib/schemas/clients";
 import { getClientStatus, getClientPriority } from "@/lib/mock-data";
 import { clientsAPI, callLogsAPI } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
@@ -84,28 +87,34 @@ export default function ClientesPage() {
   const [logs, setLogs] = useState([]);
   const searchParams = useSearchParams();
 
-  // New contact form state
-  const [newContact, setNewContact] = useState({
-    name: "",
-    phone: "",
-    address: "",
-    industry: "",
-    maquinas: "",
-    tipoCliente: "",
-    proveedorActual: "",
-    status: "prospect", // Default to prospect
+  // Form for creating new client
+  const {
+    register: registerNew,
+    handleSubmit: handleSubmitNew,
+    reset: resetNew,
+    formState: { errors: errorsNew },
+  } = useForm({
+    resolver: zodResolver(createClientSchema),
+    defaultValues: {
+      name: "",
+      phone: "",
+      address: "",
+      industry: "",
+      maquinas: "",
+      tipoCliente: "",
+      proveedorActual: "",
+      status: "prospect",
+    },
   });
 
-  // Edit contact form state
-  const [editContact, setEditContact] = useState({
-    name: "",
-    phone: "",
-    address: "",
-    industry: "",
-    maquinas: "",
-    tipoCliente: "",
-    proveedorActual: "",
-    status: "",
+  // Form for editing client
+  const {
+    register: registerEdit,
+    handleSubmit: handleSubmitEdit,
+    reset: resetEdit,
+    formState: { errors: errorsEdit },
+  } = useForm({
+    resolver: zodResolver(editClientSchema),
   });
 
   // Fetch clients from API
@@ -159,26 +168,17 @@ export default function ClientesPage() {
     }
   };
 
-  const handleNewContactSubmit = async () => {
+  const handleNewContactSubmit = async (data) => {
     try {
       const clientData = {
-        ...newContact,
-        status: "prospect",
-        tipo_cliente: newContact.tipoCliente,
-        proveedor_actual: newContact.proveedorActual,
+        ...data,
+        tipo_cliente: data.tipoCliente,
+        proveedor_actual: data.proveedorActual,
       };
 
       const createdClient = await clientsAPI.create(clientData);
       setClients((prev) => [...prev, createdClient]);
-      setNewContact({
-        name: "",
-        phone: "",
-        address: "",
-        industry: "",
-        maquinas: "",
-        tipoCliente: "",
-        proveedorActual: "",
-      });
+      resetNew();
       setIsNewContactOpen(false);
       toast.success("Cliente creado exitosamente");
     } catch (err) {
@@ -191,7 +191,7 @@ export default function ClientesPage() {
 
   const openEditDialog = (client) => {
     setClientToEdit(client);
-    setEditContact({
+    resetEdit({
       name: client.name,
       phone: client.phone,
       address: client.address || "",
@@ -204,14 +204,14 @@ export default function ClientesPage() {
     setIsEditOpen(true);
   };
 
-  const handleEditContactSubmit = async () => {
+  const handleEditContactSubmit = async (data) => {
     if (!clientToEdit) return;
 
     try {
       const clientData = {
-        ...editContact,
-        tipo_cliente: editContact.tipoCliente,
-        proveedor_actual: editContact.proveedorActual,
+        ...data,
+        tipo_cliente: data.tipoCliente,
+        proveedor_actual: data.proveedorActual,
       };
 
       const updatedClient = await clientsAPI.update(clientToEdit.id, clientData);
@@ -268,124 +268,124 @@ export default function ClientesPage() {
                   Agrega un nuevo cliente o prospecto a la lista
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="name">Nombre de la Empresa *</Label>
-                  <Input
-                    id="name"
-                    value={newContact.name}
-                    onChange={(e) =>
-                      setNewContact((prev) => ({ ...prev, name: e.target.value }))
-                    }
-                    placeholder="Ej: Papelería Central"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+              <form onSubmit={handleSubmitNew(handleNewContactSubmit)}>
+                <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="phone">Teléfono *</Label>
+                    <Label htmlFor="name">Nombre de la Empresa *</Label>
                     <Input
-                      id="phone"
-                      value={newContact.phone}
-                      onChange={(e) =>
-                        setNewContact((prev) => ({ ...prev, phone: e.target.value }))
-                      }
-                      placeholder="+54 11 1234-5678"
+                      id="name"
+                      {...registerNew("name")}
+                      placeholder="Ej: Papelería Central"
                     />
+                    {errorsNew.name && (
+                      <p className="text-sm text-destructive">
+                        {errorsNew.name.message}
+                      </p>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="phone">Teléfono *</Label>
+                      <Input
+                        id="phone"
+                        {...registerNew("phone")}
+                        placeholder="+54 11 1234-5678"
+                      />
+                      {errorsNew.phone && (
+                        <p className="text-sm text-destructive">
+                          {errorsNew.phone.message}
+                        </p>
+                      )}
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="industry">Rubro</Label>
+                      <Input
+                        id="industry"
+                        {...registerNew("industry")}
+                        placeholder="Ej: Tecnología"
+                      />
+                      {errorsNew.industry && (
+                        <p className="text-sm text-destructive">
+                          {errorsNew.industry.message}
+                        </p>
+                      )}
+                    </div>
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="industry">Rubro</Label>
+                    <Label htmlFor="address">Dirección</Label>
                     <Input
-                      id="industry"
-                      value={newContact.industry}
-                      onChange={(e) =>
-                        setNewContact((prev) => ({ ...prev, industry: e.target.value }))
-                      }
-                      placeholder="Ej: Tecnología"
+                      id="address"
+                      {...registerNew("address")}
+                      placeholder="Av. Corrientes 1234, CABA"
                     />
-                  </div>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="address">Dirección</Label>
-                  <Input
-                    id="address"
-                    value={newContact.address}
-                    onChange={(e) =>
-                      setNewContact((prev) => ({ ...prev, address: e.target.value }))
-                    }
-                    placeholder="Av. Corrientes 1234, CABA"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="maquinas">Máquinas (Marca/Modelo)</Label>
-                  <Input
-                    id="maquinas"
-                    value={newContact.maquinas}
-                    onChange={(e) =>
-                      setNewContact((prev) => ({ ...prev, maquinas: e.target.value }))
-                    }
-                    placeholder="Ej: HP LaserJet Pro M15w, Brother HL-1110"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="tipoCliente">Tipo de Cliente</Label>
-                    <Select
-                      value={newContact.tipoCliente}
-                      onValueChange={(value) =>
-                        setNewContact((prev) => ({ ...prev, tipoCliente: value }))
-                      }
-                    >
-                      <SelectTrigger id="tipoCliente">
-                        <SelectValue placeholder="Seleccionar..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="alta">Alta Prioridad (1/mes)</SelectItem>
-                        <SelectItem value="media">Media Prioridad (1 cada 2-3 meses)</SelectItem>
-                        <SelectItem value="baja">Baja Prioridad (1 cada 6+ meses)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {errorsNew.address && (
+                      <p className="text-sm text-destructive">
+                        {errorsNew.address.message}
+                      </p>
+                    )}
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="proveedorActual">Proveedor Actual</Label>
+                    <Label htmlFor="maquinas">Máquinas (Marca/Modelo)</Label>
                     <Input
-                      id="proveedorActual"
-                      value={newContact.proveedorActual}
-                      onChange={(e) =>
-                        setNewContact((prev) => ({ ...prev, proveedorActual: e.target.value }))
-                      }
-                      placeholder="Ej: Suministros BA"
+                      id="maquinas"
+                      {...registerNew("maquinas")}
+                      placeholder="Ej: HP LaserJet Pro M15w, Brother HL-1110"
                     />
-                  </div>                <div className="grid gap-2">
-                    <Label htmlFor="status">Estado *</Label>
-                    <Select
-                      value={newContact.status}
-                      onValueChange={(value) =>
-                        setNewContact((prev) => ({ ...prev, status: value }))
-                      }
-                    >
-                      <SelectTrigger id="edit-status">
-                        <SelectValue placeholder="Seleccionar estado..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="prospect">Prospecto</SelectItem>
-                        <SelectItem value="active">Cliente Activo</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {errorsNew.maquinas && (
+                      <p className="text-sm text-destructive">
+                        {errorsNew.maquinas.message}
+                      </p>
+                    )}
                   </div>
-
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="tipoCliente">Tipo de Cliente</Label>
+                      <Select
+                        onValueChange={(value) => {
+                          const event = { target: { name: "tipoCliente", value } };
+                          registerNew("tipoCliente").onChange(event);
+                        }}
+                        defaultValue=""
+                      >
+                        <SelectTrigger id="tipoCliente">
+                          <SelectValue placeholder="Seleccionar..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="alta">Alta Prioridad (1/mes)</SelectItem>
+                          <SelectItem value="media">Media Prioridad (1 cada 2-3 meses)</SelectItem>
+                          <SelectItem value="baja">Baja Prioridad (1 cada 6+ meses)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {errorsNew.tipoCliente && (
+                        <p className="text-sm text-destructive">
+                          {errorsNew.tipoCliente.message}
+                        </p>
+                      )}
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="proveedorActual">Proveedor Actual</Label>
+                      <Input
+                        id="proveedorActual"
+                        {...registerNew("proveedorActual")}
+                        placeholder="Ej: Suministros BA"
+                      />
+                      {errorsNew.proveedorActual && (
+                        <p className="text-sm text-destructive">
+                          {errorsNew.proveedorActual.message}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsNewContactOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleNewContactSubmit}
-                  disabled={!newContact.name || !newContact.phone}
-                >
-                  Guardar Contacto
-                </Button>
-              </DialogFooter>
+                <DialogFooter>
+                  <Button variant="outline" type="button" onClick={() => setIsNewContactOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit">
+                    Guardar Contacto
+                  </Button>
+                </DialogFooter>
+              </form>
             </DialogContent>
           </Dialog>
 
@@ -398,118 +398,141 @@ export default function ClientesPage() {
                   Modifica la información del cliente
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-name">Nombre de la Empresa *</Label>
-                  <Input
-                    id="edit-name"
-                    value={editContact.name}
-                    onChange={(e) =>
-                      setEditContact((prev) => ({ ...prev, name: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+              <form onSubmit={handleSubmitEdit(handleEditContactSubmit)}>
+                <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="edit-phone">Teléfono *</Label>
+                    <Label htmlFor="edit-name">Nombre de la Empresa *</Label>
                     <Input
-                      id="edit-phone"
-                      value={editContact.phone}
-                      onChange={(e) =>
-                        setEditContact((prev) => ({ ...prev, phone: e.target.value }))
-                      }
+                      id="edit-name"
+                      {...registerEdit("name")}
                     />
+                    {errorsEdit.name && (
+                      <p className="text-sm text-destructive">
+                        {errorsEdit.name.message}
+                      </p>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-phone">Teléfono *</Label>
+                      <Input
+                        id="edit-phone"
+                        {...registerEdit("phone")}
+                      />
+                      {errorsEdit.phone && (
+                        <p className="text-sm text-destructive">
+                          {errorsEdit.phone.message}
+                        </p>
+                      )}
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-industry">Rubro</Label>
+                      <Input
+                        id="edit-industry"
+                        {...registerEdit("industry")}
+                      />
+                      {errorsEdit.industry && (
+                        <p className="text-sm text-destructive">
+                          {errorsEdit.industry.message}
+                        </p>
+                      )}
+                    </div>
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="edit-industry">Rubro</Label>
+                    <Label htmlFor="edit-address">Dirección</Label>
                     <Input
-                      id="edit-industry"
-                      value={editContact.industry}
-                      onChange={(e) =>
-                        setEditContact((prev) => ({ ...prev, industry: e.target.value }))
-                      }
+                      id="edit-address"
+                      {...registerEdit("address")}
                     />
-                  </div>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-address">Dirección</Label>
-                  <Input
-                    id="edit-address"
-                    value={editContact.address}
-                    onChange={(e) =>
-                      setEditContact((prev) => ({ ...prev, address: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-maquinas">Máquinas (Marca/Modelo)</Label>
-                  <Input
-                    id="edit-maquinas"
-                    value={editContact.maquinas}
-                    onChange={(e) =>
-                      setEditContact((prev) => ({ ...prev, maquinas: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="edit-tipoCliente">Tipo de Cliente</Label>
-                    <Select
-                      value={editContact.tipoCliente}
-                      onValueChange={(value) =>
-                        setEditContact((prev) => ({ ...prev, tipoCliente: value }))
-                      }
-                    >
-                      <SelectTrigger id="edit-tipoCliente">
-                        <SelectValue placeholder="Seleccionar..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="alta">Alta Prioridad (1/mes)</SelectItem>
-                        <SelectItem value="media">Media Prioridad (1 cada 2-3 meses)</SelectItem>
-                        <SelectItem value="baja">Baja Prioridad (1 cada 6+ meses)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {errorsEdit.address && (
+                      <p className="text-sm text-destructive">
+                        {errorsEdit.address.message}
+                      </p>
+                    )}
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="edit-proveedorActual">Proveedor Actual</Label>
+                    <Label htmlFor="edit-maquinas">Máquinas (Marca/Modelo)</Label>
                     <Input
-                      id="edit-proveedorActual"
-                      value={editContact.proveedorActual}
-                      onChange={(e) =>
-                        setEditContact((prev) => ({ ...prev, proveedorActual: e.target.value }))
-                      }
+                      id="edit-maquinas"
+                      {...registerEdit("maquinas")}
                     />
-                  </div>                <div className="grid gap-2">
-                    <Label htmlFor="edit-status">Estado *</Label>
-                    <Select
-                      value={editContact.status}
-                      onValueChange={(value) =>
-                        setEditContact((prev) => ({ ...prev, status: value }))
-                      }
-                    >
-                      <SelectTrigger id="edit-status">
-                        <SelectValue placeholder="Seleccionar estado..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="prospect">Prospecto</SelectItem>
-                        <SelectItem value="active">Cliente Activo</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {errorsEdit.maquinas && (
+                      <p className="text-sm text-destructive">
+                        {errorsEdit.maquinas.message}
+                      </p>
+                    )}
                   </div>
-
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-tipoCliente">Tipo de Cliente</Label>
+                      <Select
+                        onValueChange={(value) => {
+                          const event = { target: { name: "tipoCliente", value } };
+                          registerEdit("tipoCliente").onChange(event);
+                        }}
+                        defaultValue=""
+                      >
+                        <SelectTrigger id="edit-tipoCliente">
+                          <SelectValue placeholder="Seleccionar..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="alta">Alta Prioridad (1/mes)</SelectItem>
+                          <SelectItem value="media">Media Prioridad (1 cada 2-3 meses)</SelectItem>
+                          <SelectItem value="baja">Baja Prioridad (1 cada 6+ meses)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {errorsEdit.tipoCliente && (
+                        <p className="text-sm text-destructive">
+                          {errorsEdit.tipoCliente.message}
+                        </p>
+                      )}
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-proveedorActual">Proveedor Actual</Label>
+                      <Input
+                        id="edit-proveedorActual"
+                        {...registerEdit("proveedorActual")}
+                      />
+                      {errorsEdit.proveedorActual && (
+                        <p className="text-sm text-destructive">
+                          {errorsEdit.proveedorActual.message}
+                        </p>
+                      )}
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-status">Estado *</Label>
+                      <Select
+                        onValueChange={(value) => {
+                          const event = { target: { name: "status", value } };
+                          registerEdit("status").onChange(event);
+                        }}
+                        defaultValue=""
+                      >
+                        <SelectTrigger id="edit-status">
+                          <SelectValue placeholder="Seleccionar estado..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="prospect">Prospecto</SelectItem>
+                          <SelectItem value="active">Cliente Activo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {errorsEdit.status && (
+                        <p className="text-sm text-destructive">
+                          {errorsEdit.status.message}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsEditOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleEditContactSubmit}
-                  disabled={!editContact.name || !editContact.phone}
-                >
-                  Guardar Cambios
-                </Button>
-              </DialogFooter>
+                <DialogFooter>
+                  <Button variant="outline" type="button" onClick={() => setIsEditOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit">
+                    Guardar Cambios
+                  </Button>
+                </DialogFooter>
+              </form>
             </DialogContent>
           </Dialog>
         </div>
@@ -541,10 +564,10 @@ export default function ClientesPage() {
               </button>
             ))}
           </div>
-        </div>
+        </div >
 
         {/* Clients Table - Desktop */}
-        <Card className="hidden lg:block">
+        < Card className="hidden lg:block" >
           <CardHeader>
             <CardTitle>Lista de Contactos</CardTitle>
             <CardDescription>
@@ -653,87 +676,91 @@ export default function ClientesPage() {
               </Table>
             </div>
           </CardContent>
-        </Card>
+        </Card >
 
         {/* Clients Cards - Mobile/Tablet */}
-        <div className="lg:hidden space-y-4">
-          {filteredClients.map((client) => {
-            const clientStatus = getClientStatus(client.status);
-            const clientPriority = getClientPriority(client.tipoCliente);
-            const clientLogs = getClientLogs(client.id);
-            return (
-              <Card key={client.id}>
-                <CardContent className="pt-6">
-                  <div className="flex items-start justify-between gap-4 mb-4">
-                    <div>
-                      <h3 className="font-medium text-foreground">
-                        {client.name}
-                      </h3>
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
-                        <Building2 className="w-3.5 h-3.5" />
-                        {client.industry || "-"}
+        < div className="lg:hidden space-y-4" >
+          {
+            filteredClients.map((client) => {
+              const clientStatus = getClientStatus(client.status);
+              const clientPriority = getClientPriority(client.tipoCliente);
+              const clientLogs = getClientLogs(client.id);
+              return (
+                <Card key={client.id}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between gap-4 mb-4">
+                      <div>
+                        <h3 className="font-medium text-foreground">
+                          {client.name}
+                        </h3>
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                          <Building2 className="w-3.5 h-3.5" />
+                          {client.industry || "-"}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1 items-end">
+                        <Badge className={statusColorMap[clientStatus.color]}>
+                          {clientStatus.label}
+                        </Badge>
+                        {client.tipoCliente && (
+                          <Badge variant="outline" className="text-xs">
+                            {clientPriority.label}
+                          </Badge>
+                        )}
                       </div>
                     </div>
-                    <div className="flex flex-col gap-1 items-end">
-                      <Badge className={statusColorMap[clientStatus.color]}>
-                        {clientStatus.label}
-                      </Badge>
-                      {client.tipoCliente && (
-                        <Badge variant="outline" className="text-xs">
-                          {clientPriority.label}
-                        </Badge>
+                    <div className="space-y-2 text-sm mb-4">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Phone className="w-4 h-4" />
+                        {client.phone}
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <MapPin className="w-4 h-4 shrink-0" />
+                        <span className="truncate">{client.address || "-"}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Printer className="w-4 h-4 shrink-0" />
+                        <span className="truncate">{client.maquinas || "-"}</span>
+                      </div>
+                      {client.proveedorActual && (
+                        <div className="text-muted-foreground">
+                          <span className="font-medium">Proveedor:</span> {client.proveedorActual}
+                        </div>
                       )}
                     </div>
-                  </div>
-                  <div className="space-y-2 text-sm mb-4">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Phone className="w-4 h-4" />
-                      {client.phone}
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <MapPin className="w-4 h-4 shrink-0" />
-                      <span className="truncate">{client.address || "-"}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Printer className="w-4 h-4 shrink-0" />
-                      <span className="truncate">{client.maquinas || "-"}</span>
-                    </div>
-                    {client.proveedorActual && (
-                      <div className="text-muted-foreground">
-                        <span className="font-medium">Proveedor:</span> {client.proveedorActual}
-                      </div>
+                    {clientLogs.length > 0 && (
+                      <p className="text-xs text-muted-foreground mb-4">
+                        {clientLogs.length} llamadas registradas
+                      </p>
                     )}
-                  </div>
-                  {clientLogs.length > 0 && (
-                    <p className="text-xs text-muted-foreground mb-4">
-                      {clientLogs.length} llamadas registradas
-                    </p>
-                  )}
-                  <Button
-                    className="w-full gap-2"
-                    onClick={() => handleLogCall(client)}
-                  >
-                    <Phone className="w-4 h-4" />
-                    Registrar Llamada
-                  </Button>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                    <Button
+                      className="w-full gap-2"
+                      onClick={() => handleLogCall(client)}
+                    >
+                      <Phone className="w-4 h-4" />
+                      Registrar Llamada
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })
+          }
+        </div >
 
         {/* Empty State */}
-        {filteredClients.length === 0 && (
-          <div className="text-center py-12">
-            <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-foreground mb-1">
-              No se encontraron contactos
-            </h3>
-            <p className="text-muted-foreground">
-              Intenta con otros términos de búsqueda o cambia el filtro de estado
-            </p>
-          </div>
-        )}
+        {
+          filteredClients.length === 0 && (
+            <div className="text-center py-12">
+              <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-foreground mb-1">
+                No se encontraron contactos
+              </h3>
+              <p className="text-muted-foreground">
+                Intenta con otros términos de búsqueda o cambia el filtro de estado
+              </p>
+            </div>
+          )
+        }
 
         {/* Log Call Modal */}
         <LogCallModal
@@ -742,7 +769,7 @@ export default function ClientesPage() {
           onOpenChange={setIsModalOpen}
           onSubmit={handleCallSubmit}
         />
-      </div>
-    </Suspense>
+      </div >
+    </Suspense >
   );
 }

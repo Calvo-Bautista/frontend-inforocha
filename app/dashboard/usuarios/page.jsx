@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { createUserSchema, editUserSchema, changePasswordSchema } from "@/lib/schemas/users";
 import { usersAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -123,22 +126,44 @@ export default function UsuariosPage() {
     fetchUsers();
   }, []);
 
-  const [newUser, setNewUser] = useState({
-    name: "",
-    email: "",
-    role: "",
-    password: "",
+  // Form for creating new user
+  const {
+    register: registerNew,
+    handleSubmit: handleSubmitNew,
+    reset: resetNew,
+    formState: { errors: errorsNew },
+  } = useForm({
+    resolver: zodResolver(createUserSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      role: "",
+      password: "",
+    },
   });
 
-  const [editUser, setEditUser] = useState({
-    name: "",
-    email: "",
-    role: "",
+  // Form for editing user
+  const {
+    register: registerEdit,
+    handleSubmit: handleSubmitEdit,
+    reset: resetEdit,
+    formState: { errors: errorsEdit },
+  } = useForm({
+    resolver: zodResolver(editUserSchema),
   });
 
-  const [passwordData, setPasswordData] = useState({
-    newPassword: "",
-    confirmPassword: "",
+  // Form for changing password
+  const {
+    register: registerPassword,
+    handleSubmit: handleSubmitPassword,
+    reset: resetPassword,
+    formState: { errors: errorsPassword },
+  } = useForm({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: {
+      newPassword: "",
+      confirmPassword: "",
+    },
   });
 
   // Generate next legajo number
@@ -162,17 +187,16 @@ export default function UsuariosPage() {
     );
   });
 
-  const handleCreateUser = async (e) => {
-    e.preventDefault();
+  const handleCreateUser = async (data) => {
     setIsSubmitting(true);
 
     try {
       const userData = {
-        name: newUser.name,
-        email: newUser.email,
-        role: newUser.role,
+        name: data.name,
+        email: data.email,
+        role: data.role,
         legajo: generateLegajo(),
-        password: newUser.password,
+        password: data.password,
       };
 
       const createdUser = await usersAPI.create(userData);
@@ -183,7 +207,7 @@ export default function UsuariosPage() {
       });
 
       setIsCreateOpen(false);
-      setNewUser({ name: "", email: "", role: "", password: "" });
+      resetNew();
       setShowPassword(false);
     } catch (err) {
       console.error("Error creating user:", err);
@@ -195,14 +219,13 @@ export default function UsuariosPage() {
     }
   };
 
-  const handleEditUser = async (e) => {
-    e.preventDefault();
+  const handleEditUser = async (data) => {
     if (!userToEdit) return;
 
     setIsSubmitting(true);
 
     try {
-      const updatedUser = await usersAPI.update(userToEdit.id, editUser);
+      const updatedUser = await usersAPI.update(userToEdit.id, data);
 
       setUsers((prev) =>
         prev.map((u) => (u.id === userToEdit.id ? updatedUser : u))
@@ -214,7 +237,6 @@ export default function UsuariosPage() {
 
       setIsEditOpen(false);
       setUserToEdit(null);
-      setEditUser({ name: "", email: "", role: "" });
     } catch (err) {
       console.error("Error updating user:", err);
       toast.error("Error al actualizar usuario", {
@@ -225,32 +247,23 @@ export default function UsuariosPage() {
     }
   };
 
-  const handleChangePassword = async (e) => {
-    e.preventDefault();
+  const handleChangePassword = async (data) => {
     if (!userToChangePassword) return;
-
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      toast.error("Las contraseñas no coinciden");
-      return;
-    }
-
-    if (passwordData.newPassword.length < 6) {
-      toast.error("La contraseña debe tener al menos 6 caracteres");
-      return;
-    }
 
     setIsSubmitting(true);
 
     try {
-      await usersAPI.changePassword(userToChangePassword.id, passwordData.newPassword);
+      await usersAPI.changePassword(userToChangePassword.id, {
+        password: data.newPassword,
+      });
 
       toast.success("Contraseña actualizada", {
-        description: `La contraseña de ${userToChangePassword.name} ha sido cambiada`,
+        description: `La contraseña de ${userToChangePassword.name} ha sido actualizada`,
       });
 
       setIsPasswordOpen(false);
       setUserToChangePassword(null);
-      setPasswordData({ newPassword: "", confirmPassword: "" });
+      resetPassword();
       setShowNewPassword(false);
       setShowConfirmPassword(false);
     } catch (err) {
@@ -291,7 +304,7 @@ export default function UsuariosPage() {
 
   const openEditDialog = (user) => {
     setUserToEdit(user);
-    setEditUser({
+    resetEdit({
       name: user.name,
       email: user.email,
       role: user.role,
@@ -301,7 +314,7 @@ export default function UsuariosPage() {
 
   const openPasswordDialog = (user) => {
     setUserToChangePassword(user);
-    setPasswordData({ newPassword: "", confirmPassword: "" });
+    resetPassword();
     setIsPasswordOpen(true);
   };
 
@@ -548,18 +561,19 @@ export default function UsuariosPage() {
               Ingresa los datos del nuevo usuario del sistema
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleCreateUser} className="space-y-4 mt-4">
+          <form onSubmit={handleSubmitNew(handleCreateUser)} className="space-y-4 mt-4">
             <div className="space-y-2">
               <Label htmlFor="name">Nombre Completo</Label>
               <Input
                 id="name"
                 placeholder="Juan Pérez"
-                value={newUser.name}
-                onChange={(e) =>
-                  setNewUser((prev) => ({ ...prev, name: e.target.value }))
-                }
-                required
+                {...registerNew("name")}
               />
+              {errorsNew.name && (
+                <p className="text-sm text-destructive">
+                  {errorsNew.name.message}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Correo Electrónico</Label>
@@ -567,12 +581,13 @@ export default function UsuariosPage() {
                 id="email"
                 type="email"
                 placeholder="usuario@rocha.com"
-                value={newUser.email}
-                onChange={(e) =>
-                  setNewUser((prev) => ({ ...prev, email: e.target.value }))
-                }
-                required
+                {...registerNew("email")}
               />
+              {errorsNew.email && (
+                <p className="text-sm text-destructive">
+                  {errorsNew.email.message}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Contraseña</Label>
@@ -580,13 +595,8 @@ export default function UsuariosPage() {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Mínimo 6 caracteres"
-                  value={newUser.password}
-                  onChange={(e) =>
-                    setNewUser((prev) => ({ ...prev, password: e.target.value }))
-                  }
-                  required
-                  minLength={6}
+                  placeholder="••••••••"
+                  {...registerNew("password")}
                   className="pr-10"
                 />
                 <button
@@ -601,15 +611,20 @@ export default function UsuariosPage() {
                   )}
                 </button>
               </div>
+              {errorsNew.password && (
+                <p className="text-sm text-destructive">
+                  {errorsNew.password.message}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="role">Rol</Label>
               <Select
-                value={newUser.role}
-                onValueChange={(value) =>
-                  setNewUser((prev) => ({ ...prev, role: value }))
-                }
-                required
+                onValueChange={(value) => {
+                  const event = { target: { name: "role", value } };
+                  registerNew("role").onChange(event);
+                }}
+                defaultValue=""
               >
                 <SelectTrigger id="role">
                   <SelectValue placeholder="Seleccionar rol..." />
@@ -621,6 +636,11 @@ export default function UsuariosPage() {
                   <SelectItem value="owner">Owner</SelectItem>
                 </SelectContent>
               </Select>
+              {errorsNew.role && (
+                <p className="text-sm text-destructive">
+                  {errorsNew.role.message}
+                </p>
+              )}
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
               <Button
@@ -633,7 +653,7 @@ export default function UsuariosPage() {
               </Button>
               <Button
                 type="submit"
-                disabled={isSubmitting || !newUser.name || !newUser.email || !newUser.role || !newUser.password}
+                disabled={isSubmitting}
               >
                 {isSubmitting ? (
                   <>
@@ -658,18 +678,19 @@ export default function UsuariosPage() {
               Modifica los datos del usuario
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleEditUser} className="space-y-4 mt-4">
+          <form onSubmit={handleSubmitEdit(handleEditUser)} className="space-y-4 mt-4">
             <div className="space-y-2">
               <Label htmlFor="edit-name">Nombre Completo</Label>
               <Input
                 id="edit-name"
                 placeholder="Juan Pérez"
-                value={editUser.name}
-                onChange={(e) =>
-                  setEditUser((prev) => ({ ...prev, name: e.target.value }))
-                }
-                required
+                {...registerEdit("name")}
               />
+              {errorsEdit.name && (
+                <p className="text-sm text-destructive">
+                  {errorsEdit.name.message}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-email">Correo Electrónico</Label>
@@ -677,21 +698,22 @@ export default function UsuariosPage() {
                 id="edit-email"
                 type="email"
                 placeholder="usuario@rocha.com"
-                value={editUser.email}
-                onChange={(e) =>
-                  setEditUser((prev) => ({ ...prev, email: e.target.value }))
-                }
-                required
+                {...registerEdit("email")}
               />
+              {errorsEdit.email && (
+                <p className="text-sm text-destructive">
+                  {errorsEdit.email.message}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-role">Rol</Label>
               <Select
-                value={editUser.role}
-                onValueChange={(value) =>
-                  setEditUser((prev) => ({ ...prev, role: value }))
-                }
-                required
+                onValueChange={(value) => {
+                  const event = { target: { name: "role", value } };
+                  registerEdit("role").onChange(event);
+                }}
+                defaultValue=""
               >
                 <SelectTrigger id="edit-role">
                   <SelectValue placeholder="Seleccionar rol..." />
@@ -703,6 +725,11 @@ export default function UsuariosPage() {
                   <SelectItem value="owner">Owner</SelectItem>
                 </SelectContent>
               </Select>
+              {errorsEdit.role && (
+                <p className="text-sm text-destructive">
+                  {errorsEdit.role.message}
+                </p>
+              )}
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
               <Button
@@ -715,7 +742,7 @@ export default function UsuariosPage() {
               </Button>
               <Button
                 type="submit"
-                disabled={isSubmitting || !editUser.name || !editUser.email || !editUser.role}
+                disabled={isSubmitting}
               >
                 {isSubmitting ? (
                   <>
@@ -742,7 +769,7 @@ export default function UsuariosPage() {
               )}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleChangePassword} className="space-y-4 mt-4">
+          <form onSubmit={handleSubmitPassword(handleChangePassword)} className="space-y-4 mt-4">
             <div className="space-y-2">
               <Label htmlFor="new-password">Nueva Contraseña</Label>
               <div className="relative">
@@ -750,12 +777,7 @@ export default function UsuariosPage() {
                   id="new-password"
                   type={showNewPassword ? "text" : "password"}
                   placeholder="Mínimo 6 caracteres"
-                  value={passwordData.newPassword}
-                  onChange={(e) =>
-                    setPasswordData((prev) => ({ ...prev, newPassword: e.target.value }))
-                  }
-                  required
-                  minLength={6}
+                  {...registerPassword("newPassword")}
                   className="pr-10"
                 />
                 <button
@@ -770,6 +792,11 @@ export default function UsuariosPage() {
                   )}
                 </button>
               </div>
+              {errorsPassword.newPassword && (
+                <p className="text-sm text-destructive">
+                  {errorsPassword.newPassword.message}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm-password">Confirmar Contraseña</Label>
@@ -778,12 +805,7 @@ export default function UsuariosPage() {
                   id="confirm-password"
                   type={showConfirmPassword ? "text" : "password"}
                   placeholder="Repetir contraseña"
-                  value={passwordData.confirmPassword}
-                  onChange={(e) =>
-                    setPasswordData((prev) => ({ ...prev, confirmPassword: e.target.value }))
-                  }
-                  required
-                  minLength={6}
+                  {...registerPassword("confirmPassword")}
                   className="pr-10"
                 />
                 <button
@@ -798,8 +820,10 @@ export default function UsuariosPage() {
                   )}
                 </button>
               </div>
-              {passwordData.newPassword && passwordData.confirmPassword && passwordData.newPassword !== passwordData.confirmPassword && (
-                <p className="text-xs text-destructive">Las contraseñas no coinciden</p>
+              {errorsPassword.confirmPassword && (
+                <p className="text-sm text-destructive">
+                  {errorsPassword.confirmPassword.message}
+                </p>
               )}
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
@@ -813,13 +837,7 @@ export default function UsuariosPage() {
               </Button>
               <Button
                 type="submit"
-                disabled={
-                  isSubmitting ||
-                  !passwordData.newPassword ||
-                  !passwordData.confirmPassword ||
-                  passwordData.newPassword !== passwordData.confirmPassword ||
-                  passwordData.newPassword.length < 6
-                }
+                disabled={isSubmitting}
               >
                 {isSubmitting ? (
                   <>
