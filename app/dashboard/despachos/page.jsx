@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { formatCurrency, getOrderStatus } from "@/lib/mock-data";
 import { ordersAPI } from "@/lib/api";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -70,6 +71,12 @@ export default function DespachosPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [limit] = useState(8);
+  const [totalItems, setTotalItems] = useState(0);
+
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
@@ -78,8 +85,22 @@ export default function DespachosPage() {
     const fetchOrders = async () => {
       try {
         setIsLoading(true);
-        const data = await ordersAPI.getAll();
+        const params = {
+          skip: (page - 1) * limit,
+          limit: limit,
+        };
+        if (statusFilter !== "all") {
+          params.status_filter = statusFilter;
+        }
+        if (searchTerm) {
+          params.search = searchTerm;
+        }
+
+        const data = await ordersAPI.getAll(params);
         setOrdersList(data);
+        if (data.total !== undefined) {
+          setTotalItems(data.total);
+        }
       } catch (err) {
         console.error("Error fetching orders:", err);
         toast.error("Error al cargar órdenes", {
@@ -89,20 +110,22 @@ export default function DespachosPage() {
         setIsLoading(false);
       }
     };
-    fetchOrders();
-  }, []);
+
+    // Simple debounce via timeout
+    const timer = setTimeout(() => {
+      fetchOrders();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [statusFilter, searchTerm, page, limit]);
 
   const shippableOrders = useMemo(() => {
     return ordersList;
   }, [ordersList]);
 
   const filteredOrders = useMemo(() => {
-    return shippableOrders.filter((order) => {
-      const matchesSearch = String(order.id).toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter === "all" || order.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [shippableOrders, searchTerm, statusFilter]);
+    return shippableOrders;
+  }, [shippableOrders]);
 
   const handleStatusChange = async (orderId, newStatus) => {
     try {
@@ -408,6 +431,15 @@ export default function DespachosPage() {
           })
         )}
       </div>
+
+      {/* Pagination Controls */}
+      <PaginationControls
+        currentPage={page}
+        totalPages={Math.ceil(totalItems / limit)}
+        onPageChange={setPage}
+        totalItems={totalItems}
+        itemsPerPage={limit}
+      />
 
       {/* Order Detail Modal */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>

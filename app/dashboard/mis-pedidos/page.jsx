@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { formatCurrency, getOrderStatus } from "@/lib/mock-data";
 import { ordersAPI } from "@/lib/api";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -46,17 +47,32 @@ export default function MisPedidosPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const searchParams = useSearchParams();
 
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [limit] = useState(8);
+  const [totalItems, setTotalItems] = useState(0);
+
   // Fetch orders from API
   useEffect(() => {
     const fetchOrders = async () => {
       try {
         setIsLoading(true);
-        const params = {};
+        const params = {
+          skip: (page - 1) * limit,
+          limit: limit,
+        };
         if (statusFilter !== "all") {
-          params.status = statusFilter;
+          params.status_filter = statusFilter;
         }
+        if (searchTerm) {
+          params.search = searchTerm;
+        }
+
         const data = await ordersAPI.getAll(params);
         setOrders(data);
+        if (data.total !== undefined) {
+          setTotalItems(data.total);
+        }
       } catch (err) {
         console.error("Error fetching orders:", err);
         toast.error("Error al cargar pedidos", {
@@ -66,8 +82,13 @@ export default function MisPedidosPage() {
         setIsLoading(false);
       }
     };
-    fetchOrders();
-  }, [statusFilter]);
+
+    const timer = setTimeout(() => {
+      fetchOrders();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [statusFilter, searchTerm, page, limit]);
 
   // Debug: log first order to see structure
   useEffect(() => {
@@ -77,13 +98,8 @@ export default function MisPedidosPage() {
   }, [orders]);
 
   const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
-      const matchesSearch =
-        order.order_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.client?.name?.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesSearch;
-    });
-  }, [orders, searchTerm]);
+    return orders;
+  }, [orders]);
 
   const statusFilters = [
     { value: "all", label: "Todos" },
@@ -270,6 +286,15 @@ export default function MisPedidosPage() {
           );
         })}
       </div>
+
+      {/* Pagination Controls */}
+      <PaginationControls
+        currentPage={page}
+        totalPages={Math.ceil(totalItems / limit)}
+        onPageChange={setPage}
+        totalItems={totalItems}
+        itemsPerPage={limit}
+      />
 
       {/* Empty State */}
       {filteredOrders.length === 0 && (

@@ -46,6 +46,7 @@ import { cn } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import Loading from "./loading";
+import { PaginationControls } from "@/components/ui/pagination-controls"; // Import
 import { toast } from "sonner";
 
 export default function ProductosPage() {
@@ -56,6 +57,11 @@ export default function ProductosPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const searchParams = useSearchParams();
+
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [limit] = useState(8);
+  const [totalItems, setTotalItems] = useState(0);
 
   // Modal states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -104,7 +110,10 @@ export default function ProductosPage() {
         setIsLoading(true);
         setError(null);
 
-        const params = {};
+        const params = {
+          skip: (page - 1) * limit,
+          limit: limit,
+        };
         if (categoryFilter !== "all") {
           params.category = categoryFilter;
         }
@@ -114,6 +123,9 @@ export default function ProductosPage() {
 
         const data = await productsAPI.getAll(params);
         setProducts(data);
+        if (data.total !== undefined) {
+          setTotalItems(data.total);
+        }
       } catch (err) {
         console.error("Error fetching products:", err);
         setError(err.message);
@@ -126,7 +138,7 @@ export default function ProductosPage() {
     };
 
     fetchProducts();
-  }, [categoryFilter, debouncedSearchTerm]);
+  }, [categoryFilter, debouncedSearchTerm, page, limit]);
 
   const categories = [
     { value: "all", label: "Todos" },
@@ -402,6 +414,15 @@ export default function ProductosPage() {
             </Card>
           ))}
         </div>
+
+        {/* Pagination Controls */}
+        <PaginationControls
+          currentPage={page}
+          totalPages={Math.ceil(totalItems / limit)}
+          onPageChange={setPage}
+          totalItems={totalItems}
+          itemsPerPage={limit}
+        />
 
         {/* Empty State */}
         {products.length === 0 && !isLoading && !error && (

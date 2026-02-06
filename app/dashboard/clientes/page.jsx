@@ -9,6 +9,7 @@ import { clientsAPI, callLogsAPI } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
 import { toast } from "sonner";
 import { LogCallModal } from "@/components/log-call-modal";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -90,6 +91,11 @@ export default function ClientesPage() {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [limit] = useState(8);
+  const [totalItems, setTotalItems] = useState(0);
   const [selectedClient, setSelectedClient] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNewContactOpen, setIsNewContactOpen] = useState(false);
@@ -137,7 +143,10 @@ export default function ClientesPage() {
         setIsLoading(true);
         setError(null);
 
-        const params = {};
+        const params = {
+          skip: (page - 1) * limit,
+          limit: limit,
+        };
         if (statusFilter !== "all") {
           params.status = statusFilter;
         }
@@ -147,6 +156,9 @@ export default function ClientesPage() {
 
         const data = await clientsAPI.getAll(params);
         setClients(data);
+        if (data.total !== undefined) {
+          setTotalItems(data.total);
+        }
       } catch (err) {
         console.error("Error fetching clients:", err);
         setError(err.message);
@@ -159,7 +171,7 @@ export default function ClientesPage() {
     };
 
     fetchClients();
-  }, [statusFilter, searchTerm]);
+  }, [statusFilter, searchTerm, page, limit]);
 
   const filteredClients = clients;
 
@@ -797,6 +809,15 @@ export default function ClientesPage() {
             })
           }
         </div >
+
+        {/* Pagination Controls */}
+        <PaginationControls
+          currentPage={page}
+          totalPages={Math.ceil(totalItems / limit)}
+          onPageChange={setPage}
+          totalItems={totalItems}
+          itemsPerPage={limit}
+        />
 
         {/* Empty State */}
         {

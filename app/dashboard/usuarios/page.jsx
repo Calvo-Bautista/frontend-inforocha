@@ -7,6 +7,7 @@ import { createUserSchema, editUserSchema, changePasswordSchema } from "@/lib/sc
 import { useAuth } from "@/contexts/auth-context";
 import SettingsModal from "./components/settings-modal";
 import { usersAPI } from "@/lib/api";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -111,13 +112,29 @@ export default function UsuariosPage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [limit] = useState(8);
+  const [totalItems, setTotalItems] = useState(0);
+
   // Fetch users from API
   useEffect(() => {
     const fetchUsers = async () => {
       try {
         setIsLoading(true);
-        const data = await usersAPI.getAll();
+        const params = {
+          skip: (page - 1) * limit,
+          limit: limit,
+        };
+        if (searchTerm) {
+          params.search = searchTerm;
+        }
+
+        const data = await usersAPI.getAll(params);
         setUsers(data);
+        if (data.total !== undefined) {
+          setTotalItems(data.total);
+        }
       } catch (err) {
         console.error("Error fetching users:", err);
         setError(err.message);
@@ -129,8 +146,12 @@ export default function UsuariosPage() {
       }
     };
 
-    fetchUsers();
-  }, []);
+    const timer = setTimeout(() => {
+      fetchUsers();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, page, limit]);
 
   // Form for creating new user
   const {
@@ -183,15 +204,8 @@ export default function UsuariosPage() {
     return `LEG-${String(nextNumber).padStart(3, '0')}`;
   };
 
-  // Filter users by search term
-  const filteredUsers = users.filter(user => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      user.name.toLowerCase().includes(searchLower) ||
-      user.legajo?.toLowerCase().includes(searchLower) ||
-      user.email.toLowerCase().includes(searchLower)
-    );
-  });
+  // Filter users by search term (Server side handled)
+  const filteredUsers = users;
 
   const handleCreateUser = async (data) => {
     setIsSubmitting(true);
@@ -566,6 +580,17 @@ export default function UsuariosPage() {
         ))}
       </div>
 
+
+
+      {/* Pagination Controls */}
+      <PaginationControls
+        currentPage={page}
+        totalPages={Math.ceil(totalItems / limit)}
+        onPageChange={setPage}
+        totalItems={totalItems}
+        itemsPerPage={limit}
+      />
+
       {/* Create User Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
@@ -903,6 +928,6 @@ export default function UsuariosPage() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       />
-    </div>
+    </div >
   );
 }
