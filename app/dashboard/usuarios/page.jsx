@@ -486,7 +486,7 @@ export default function UsuariosPage() {
                   <TableCell>
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Calendar className="w-4 h-4" />
-                      {new Date(user.createdAt).toLocaleDateString("es-AR")}
+                      {new Date(user.created_at).toLocaleDateString("es-AR")}
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
@@ -545,7 +545,7 @@ export default function UsuariosPage() {
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5" />
-                  {new Date(user.createdAt).toLocaleDateString("es-AR")}
+                  {new Date(user.created_at).toLocaleDateString("es-AR")}
                 </span>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

@@ -17,15 +17,34 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2, Plus, Trash2, Shield, Settings, Percent } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+const MODULES = [
+    { id: "productos", label: "Productos" },
+    { id: "clientes", label: "Compradores & Llamadas" },
+    { id: "nueva-orden", label: "Nueva Orden" },
+    { id: "mis-pedidos", label: "Mis Pedidos" },
+    { id: "despachos", label: "Despachos" },
+    { id: "usuarios", label: "Usuarios" },
+];
+
+const ROLES = [
+    { id: "vendedor", label: "Vendedor" },
+    { id: "logistica", label: "Logística" },
+    { id: "admin", label: "Administrador" },
+    { id: "owner", label: "Owner" },
+];
 
 const configSchema = z.object({
     shipping_cost: z.coerce.number().min(0, "El costo debe ser mayor o igual a 0"),
     discounts: z.array(z.object({
         threshold: z.coerce.number().min(0, "El umbral debe ser mayor o igual a 0"),
         percentage: z.coerce.number().min(0).max(100, "El porcentaje debe estar entre 0 y 100"),
-    }))
+    })),
+    role_permissions: z.record(z.array(z.string()))
 });
 
 export default function SettingsModal({ isOpen, onClose }) {
@@ -37,14 +56,19 @@ export default function SettingsModal({ isOpen, onClose }) {
         control,
         handleSubmit,
         reset,
+        watch,
+        setValue,
         formState: { errors },
     } = useForm({
         resolver: zodResolver(configSchema),
         defaultValues: {
             shipping_cost: 0,
-            discounts: []
+            discounts: [],
+            role_permissions: {}
         },
     });
+
+    const rolePermissions = watch("role_permissions");
 
     const { fields, append, remove } = useFieldArray({
         control,
@@ -61,8 +85,17 @@ export default function SettingsModal({ isOpen, onClose }) {
         try {
             setIsLoading(true);
             const data = await configAPI.get();
-            // Ensure discounts is an array
+            // Ensure defaults
             if (!data.discounts) data.discounts = [];
+            if (!data.role_permissions) data.role_permissions = {};
+
+            // Initialize missing roles
+            ROLES.forEach(role => {
+                if (!data.role_permissions[role.id]) {
+                    data.role_permissions[role.id] = [];
+                }
+            });
+
             reset(data);
         } catch (error) {
             console.error("Error loading config:", error);
@@ -70,6 +103,19 @@ export default function SettingsModal({ isOpen, onClose }) {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const togglePermission = (roleId, moduleId) => {
+        const currentPermissions = { ...rolePermissions };
+        const rolePerms = currentPermissions[roleId] || [];
+
+        if (rolePerms.includes(moduleId)) {
+            currentPermissions[roleId] = rolePerms.filter(id => id !== moduleId);
+        } else {
+            currentPermissions[roleId] = [...rolePerms, moduleId];
+        }
+
+        setValue("role_permissions", currentPermissions, { shouldDirty: true });
     };
 
     const onSubmit = async (data) => {
@@ -88,110 +134,168 @@ export default function SettingsModal({ isOpen, onClose }) {
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[600px] h-[80vh] flex flex-col">
-                <DialogHeader>
-                    <DialogTitle>Configuración del Sistema</DialogTitle>
-                    <DialogDescription>
-                        Ajusta los costos de envío y reglas de descuento.
-                    </DialogDescription>
-                </DialogHeader>
+            <DialogContent className="sm:max-w-[700px] h-[85vh] flex flex-col p-0">
+                <div className="p-6 pb-2">
+                    <DialogHeader>
+                        <DialogTitle>Configuración del Sistema</DialogTitle>
+                        <DialogDescription>
+                            Ajusta los costos, descuentos y permisos de acceso por rol.
+                        </DialogDescription>
+                    </DialogHeader>
+                </div>
 
                 {isLoading ? (
-                    <div className="flex justify-center py-8">
+                    <div className="flex-1 flex items-center justify-center">
                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     </div>
                 ) : (
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 py-4 flex-1 flex flex-col overflow-hidden">
-
-                        {/* Shipping Cost Section */}
-                        <div className="space-y-2 p-4 border rounded-lg bg-secondary/20">
-                            <Label className="text-base font-semibold">Costo de Envío</Label>
-                            <div className="space-y-1">
-                                <Label className="text-xs text-muted-foreground">Valor por defecto ($)</Label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    {...register("shipping_cost")}
-                                    className={errors.shipping_cost ? "border-destructive" : ""}
-                                />
-                                {errors.shipping_cost && (
-                                    <p className="text-sm text-destructive">{errors.shipping_cost.message}</p>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Dynamic Discounts Section */}
-                        <div className="flex-1 flex flex-col min-h-0 border rounded-lg p-4 bg-secondary/20">
-                            <div className="flex justify-between items-center mb-4">
-                                <Label className="text-base font-semibold">Reglas de Descuento</Label>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => append({ threshold: 0, percentage: 0 })}
-                                    className="gap-2"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    Agregar Regla
-                                </Button>
+                    <form onSubmit={handleSubmit(onSubmit)} className="flex-1 flex flex-col min-h-0">
+                        <Tabs defaultValue="costs" className="flex-1 flex flex-col min-h-0">
+                            <div className="px-6 border-b">
+                                <TabsList className="bg-transparent border-b-0 gap-6 h-12">
+                                    <TabsTrigger value="costs" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none shadow-none px-0 h-11">
+                                        <Percent className="w-4 h-4 mr-2" />
+                                        Precios y Descuentos
+                                    </TabsTrigger>
+                                    <TabsTrigger value="permissions" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none shadow-none px-0 h-11">
+                                        <Shield className="w-4 h-4 mr-2" />
+                                        Permisos por Rol
+                                    </TabsTrigger>
+                                </TabsList>
                             </div>
 
-                            <ScrollArea className="flex-1 pr-4">
-                                <div className="space-y-4">
-                                    {fields.map((field, index) => (
-                                        <div key={field.id} className="flex gap-4 items-start p-3 bg-background rounded-md border animate-in fade-in slide-in-from-bottom-2">
-                                            <div className="flex-1 space-y-2">
-                                                <Label className="text-xs">Umbral ($)</Label>
-                                                <Input
-                                                    type="number"
-                                                    {...register(`discounts.${index}.threshold`)}
-                                                    placeholder="Ej: 100000"
-                                                />
-                                                {errors.discounts?.[index]?.threshold && (
-                                                    <p className="text-xs text-destructive">{errors.discounts[index].threshold.message}</p>
-                                                )}
-                                            </div>
-                                            <div className="flex-1 space-y-2">
-                                                <Label className="text-xs">Porcentaje (%)</Label>
-                                                <Input
-                                                    type="number"
-                                                    step="0.1"
-                                                    {...register(`discounts.${index}.percentage`)}
-                                                    placeholder="Ej: 5"
-                                                />
-                                                {errors.discounts?.[index]?.percentage && (
-                                                    <p className="text-xs text-destructive">{errors.discounts[index].percentage.message}</p>
-                                                )}
-                                            </div>
+                            <div className="flex-1 overflow-hidden">
+                                <TabsContent value="costs" className="h-full m-0 p-6 space-y-6 overflow-y-auto">
+                                    {/* Shipping Cost Section */}
+                                    <div className="space-y-4 p-4 border rounded-lg bg-secondary/20">
+                                        <Label className="flex items-center gap-2 text-base font-semibold">
+                                            <Settings className="w-4 h-4" />
+                                            Costo de Envío
+                                        </Label>
+                                        <div className="space-y-1">
+                                            <Label className="text-xs text-muted-foreground">Valor por defecto ($)</Label>
+                                            <Input
+                                                type="number"
+                                                step="0.01"
+                                                {...register("shipping_cost")}
+                                                className={errors.shipping_cost ? "border-destructive" : ""}
+                                            />
+                                            {errors.shipping_cost && (
+                                                <p className="text-sm text-destructive">{errors.shipping_cost.message}</p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Dynamic Discounts Section */}
+                                    <div className="space-y-4 p-4 border rounded-lg bg-secondary/20 min-h-[300px]">
+                                        <div className="flex justify-between items-center">
+                                            <Label className="flex items-center gap-2 text-base font-semibold">
+                                                <Percent className="w-4 h-4" />
+                                                Reglas de Descuento
+                                            </Label>
                                             <Button
                                                 type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                className="mt-8 text-muted-foreground hover:text-destructive"
-                                                onClick={() => remove(index)}
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => append({ threshold: 0, percentage: 0 })}
+                                                className="gap-2"
                                             >
-                                                <Trash2 className="w-4 h-4" />
+                                                <Plus className="w-4 h-4" />
+                                                Agregar Regla
                                             </Button>
                                         </div>
-                                    ))}
-                                    {fields.length === 0 && (
-                                        <div className="text-center py-8 text-muted-foreground text-sm border-2 border-dashed rounded-lg">
-                                            No hay reglas de descuento definidas
-                                        </div>
-                                    )}
-                                </div>
-                            </ScrollArea>
-                        </div>
 
-                        <DialogFooter className="mt-auto pt-4">
-                            <Button type="button" variant="outline" onClick={onClose}>
-                                Cancelar
-                            </Button>
-                            <Button type="submit" disabled={isSaving}>
-                                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Guardar Cambios
-                            </Button>
-                        </DialogFooter>
+                                        <div className="space-y-4">
+                                            {fields.map((field, index) => (
+                                                <div key={field.id} className="flex gap-4 items-start p-3 bg-background rounded-md border animate-in fade-in slide-in-from-bottom-2">
+                                                    <div className="flex-1 space-y-2">
+                                                        <Label className="text-xs">Umbral ($)</Label>
+                                                        <Input
+                                                            type="number"
+                                                            {...register(`discounts.${index}.threshold`)}
+                                                            placeholder="Ej: 100000"
+                                                        />
+                                                    </div>
+                                                    <div className="flex-1 space-y-2">
+                                                        <Label className="text-xs">Porcentaje (%)</Label>
+                                                        <Input
+                                                            type="number"
+                                                            step="0.1"
+                                                            {...register(`discounts.${index}.percentage`)}
+                                                            placeholder="Ej: 5"
+                                                        />
+                                                    </div>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="mt-8 text-muted-foreground hover:text-destructive"
+                                                        onClick={() => remove(index)}
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                </div>
+                                            ))}
+                                            {fields.length === 0 && (
+                                                <div className="text-center py-8 text-muted-foreground text-sm border-2 border-dashed rounded-lg">
+                                                    No hay reglas de descuento definidas
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </TabsContent>
+
+                                <TabsContent value="permissions" className="h-full m-0 p-6 overflow-y-auto">
+                                    <div className="border rounded-lg overflow-hidden">
+                                        <table className="w-full text-sm">
+                                            <thead className="bg-secondary/50 border-b">
+                                                <tr>
+                                                    <th className="p-3 text-left font-semibold">Módulo / Permiso</th>
+                                                    {ROLES.map(role => (
+                                                        <th key={role.id} className="p-3 text-center font-semibold">
+                                                            {role.label}
+                                                        </th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y">
+                                                {MODULES.map(mod => (
+                                                    <tr key={mod.id} className="hover:bg-secondary/10 transition-colors">
+                                                        <td className="p-3 font-medium">{mod.label}</td>
+                                                        {ROLES.map(role => {
+                                                            const isChecked = rolePermissions?.[role.id]?.includes(mod.id);
+                                                            return (
+                                                                <td key={`${role.id}-${mod.id}`} className="p-3 text-center">
+                                                                    <Checkbox
+                                                                        checked={isChecked}
+                                                                        onCheckedChange={() => togglePermission(role.id, mod.id)}
+                                                                    />
+                                                                </td>
+                                                            );
+                                                        })}
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-4 italic">
+                                        * Los cambios reiniciarán el acceso de los usuarios la próxima vez que carguen la aplicación.
+                                    </p>
+                                </TabsContent>
+                            </div>
+                        </Tabs>
+
+                        <div className="p-6 border-t mt-auto">
+                            <DialogFooter>
+                                <Button type="button" variant="outline" onClick={onClose}>
+                                    Cancelar
+                                </Button>
+                                <Button type="submit" disabled={isSaving}>
+                                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Guardar Cambios
+                                </Button>
+                            </DialogFooter>
+                        </div>
                     </form>
                 )}
             </DialogContent>

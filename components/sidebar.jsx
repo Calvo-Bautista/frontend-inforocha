@@ -17,43 +17,51 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { configAPI } from "@/lib/api";
 
-const roleNavItems = {
-  vendedor: [
-    { href: "/dashboard/productos", label: "Productos", icon: Package },
-    { href: "/dashboard/clientes", label: "Compradores & Llamadas", icon: Users },
-    { href: "/dashboard/nueva-orden", label: "Nueva Orden", icon: ShoppingCart },
-    { href: "/dashboard/mis-pedidos", label: "Mis Pedidos", icon: ClipboardList },
-  ],
-  logistica: [
-    { href: "/dashboard/clientes", label: "Compradores & Llamadas", icon: Users },
-    { href: "/dashboard/despachos", label: "Despachos", icon: Truck },
-  ],
-  admin: [
-    { href: "/dashboard/usuarios", label: "Usuarios", icon: UserCog },
-  ],
-  owner: [
-    // Vistas de Vendedor
-    { href: "/dashboard/productos", label: "Productos", icon: Package },
-    { href: "/dashboard/clientes", label: "Compradores & Llamadas", icon: Users },
-    { href: "/dashboard/nueva-orden", label: "Nueva Orden", icon: ShoppingCart },
-    { href: "/dashboard/mis-pedidos", label: "Mis Pedidos", icon: ClipboardList },
-    // Vistas de Logística
-    { href: "/dashboard/despachos", label: "Despachos", icon: Truck },
-    // Vistas de Admin
-    { href: "/dashboard/usuarios", label: "Usuarios", icon: UserCog },
-  ],
+const ALL_NAV_ITEMS = [
+  { id: "productos", href: "/dashboard/productos", label: "Productos", icon: Package },
+  { id: "clientes", href: "/dashboard/clientes", label: "Compradores & Llamadas", icon: Users },
+  { id: "nueva-orden", href: "/dashboard/nueva-orden", label: "Nueva Orden", icon: ShoppingCart },
+  { id: "mis-pedidos", href: "/dashboard/mis-pedidos", label: "Mis Pedidos", icon: ClipboardList },
+  { id: "despachos", href: "/dashboard/despachos", label: "Despachos", icon: Truck },
+  { id: "usuarios", href: "/dashboard/usuarios", label: "Usuarios", icon: UserCog },
+];
+
+const DEFAULT_PERMISSIONS = {
+  vendedor: ["productos", "clientes", "nueva-orden", "mis-pedidos"],
+  logistica: ["clientes", "despachos"],
+  admin: ["usuarios"],
+  owner: ["productos", "clientes", "nueva-orden", "mis-pedidos", "despachos", "usuarios"],
 };
 
 export function Sidebar() {
   const { user, logout } = useAuth();
   const pathname = usePathname();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [config, setConfig] = useState(null);
+
+  useEffect(() => {
+    if (user) {
+      configAPI.get()
+        .then(setConfig)
+        .catch(err => {
+          console.error("Error fetching sidebar permissions:", err);
+        });
+    }
+  }, [user]);
+
+  const navItems = useMemo(() => {
+    if (!user) return [];
+
+    // Use permissions from config if available, otherwise use defaults
+    const allowedModuleIds = config?.role_permissions?.[user.role] || DEFAULT_PERMISSIONS[user.role] || [];
+
+    return ALL_NAV_ITEMS.filter(item => allowedModuleIds.includes(item.id));
+  }, [user, config]);
 
   if (!user) return null;
-
-  const navItems = roleNavItems[user.role] || [];
 
   const NavContent = () => (
     <>
