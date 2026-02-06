@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createUserSchema, editUserSchema, changePasswordSchema } from "@/lib/schemas/users";
+import { useAuth } from "@/contexts/auth-context";
+import SettingsModal from "./components/settings-modal";
 import { usersAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -72,6 +74,7 @@ import {
   Eye,
   EyeOff,
   Search,
+  Settings,
 } from "lucide-react";
 
 const roleColorMap = {
@@ -97,7 +100,10 @@ export default function UsuariosPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
+  const { user } = useAuth();
   const [userToEdit, setUserToEdit] = useState(null);
   const [userToChangePassword, setUserToChangePassword] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -346,10 +352,18 @@ export default function UsuariosPage() {
             Administra los usuarios del sistema y modifica los parametros del sistema
           </p>
         </div>
-        <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
-          <Plus className="w-4 h-4" />
-          Nuevo Usuario
-        </Button>
+        <div className="flex items-center gap-4">
+          {(user?.role === 'admin' || user?.role === 'owner') && (
+            <Button variant="outline" onClick={() => setIsSettingsOpen(true)} className="gap-2">
+              <Settings className="w-4 h-4" />
+              Configuración
+            </Button>
+          )}
+          <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
+            <Plus className="w-4 h-4" />
+            Nuevo Usuario
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -885,6 +899,10 @@ export default function UsuariosPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
     </div>
   );
 }

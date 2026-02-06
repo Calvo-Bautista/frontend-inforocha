@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { clientsAPI, productsAPI, ordersAPI } from "@/lib/api";
+import { clientsAPI, productsAPI, ordersAPI, configAPI } from "@/lib/api";
 import { formatCurrency } from "@/lib/mock-data";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -41,7 +41,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const SHIPPING_COST = 8000;
+const DEFAULT_SHIPPING_COST = 8000;
 
 export default function NuevaOrdenPage() {
   const router = useRouter();
@@ -65,8 +65,10 @@ export default function NuevaOrdenPage() {
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
 
   // Data from API
+  // Data from API
   const [clients, setClients] = useState([]);
   const [products, setProducts] = useState([]);
+  const [systemConfig, setSystemConfig] = useState(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   // Refs for click outside
@@ -78,12 +80,15 @@ export default function NuevaOrdenPage() {
     const fetchData = async () => {
       try {
         setIsLoadingData(true);
-        const [clientsData, productsData] = await Promise.all([
+
+        const [clientsData, productsData, configData] = await Promise.all([
           clientsAPI.getAll({ status: 'active' }),
           productsAPI.getAll(),
+          configAPI.get(),
         ]);
         setClients(clientsData);
         setProducts(productsData);
+        setSystemConfig(configData);
       } catch (err) {
         console.error("Error fetching data:", err);
         toast.error("Error al cargar datos", {
@@ -202,11 +207,21 @@ export default function NuevaOrdenPage() {
   }, [cartItems]);
 
   // Determine available discount percentage based on subtotal
+
   const availableDiscountPercent = useMemo(() => {
-    if (cartSubtotal >= 300000) return 10;
-    if (cartSubtotal >= 100000) return 5;
+    if (!systemConfig) return 0;
+
+    // Cast strict numeric values to avoid string comparison issues
+    const subtotal = Number(cartSubtotal);
+    const threshold1 = Number(systemConfig.discount_threshold_1);
+    const threshold2 = Number(systemConfig.discount_threshold_2);
+    const threshold3 = Number(systemConfig.discount_threshold_3);
+
+    if (subtotal >= threshold3) return Number(systemConfig.discount_percentage_3);
+    if (subtotal >= threshold2) return Number(systemConfig.discount_percentage_2);
+    if (subtotal >= threshold1) return Number(systemConfig.discount_percentage_1);
     return 0;
-  }, [cartSubtotal]);
+  }, [cartSubtotal, systemConfig]);
 
   // Calculate discount amount
   const discountAmount = useMemo(() => {
@@ -215,7 +230,8 @@ export default function NuevaOrdenPage() {
   }, [cartSubtotal, applyDiscount, availableDiscountPercent]);
 
   // Calculate shipping
-  const shippingCost = waiveShipping ? 0 : SHIPPING_COST;
+  // Calculate shipping
+  const shippingCost = waiveShipping ? 0 : Number(systemConfig?.shipping_cost || DEFAULT_SHIPPING_COST);
 
   // Calculate final total
   const cartTotal = useMemo(() => {
@@ -666,11 +682,11 @@ export default function NuevaOrdenPage() {
                       </div>
                       {waiveShipping ? (
                         <span className="text-sm font-medium text-success">
-                          -{formatCurrency(SHIPPING_COST)}
+                          -{formatCurrency(Number(systemConfig?.shipping_cost || DEFAULT_SHIPPING_COST))}
                         </span>
                       ) : (
                         <span className="text-sm text-muted-foreground">
-                          +{formatCurrency(SHIPPING_COST)}
+                          +{formatCurrency(Number(systemConfig?.shipping_cost || DEFAULT_SHIPPING_COST))}
                         </span>
                       )}
                     </div>
@@ -691,7 +707,7 @@ export default function NuevaOrdenPage() {
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Envío</span>
                       <span className={waiveShipping ? "line-through text-muted-foreground" : ""}>
-                        {formatCurrency(SHIPPING_COST)}
+                        {formatCurrency(Number(systemConfig?.shipping_cost || DEFAULT_SHIPPING_COST))}
                       </span>
                     </div>
                     <div className="flex justify-between text-lg font-bold pt-2 border-t border-border">
