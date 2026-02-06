@@ -149,6 +149,15 @@ export default function NuevaOrdenPage() {
       (item) => item.productId === selectedProduct.id
     );
 
+    // Calculate total quantity if product already in cart
+    const currentCartQuantity = existingItemIndex > -1 ? cartItems[existingItemIndex].quantity : 0;
+    const totalRequested = currentCartQuantity + quantity;
+
+    if (totalRequested > selectedProduct.stock) {
+      toast.error(`No hay suficiente stock. Disponible: ${selectedProduct.stock}, En carrito: ${currentCartQuantity}`);
+      return;
+    }
+
     if (existingItemIndex > -1) {
       setCartItems((prev) =>
         prev.map((item, index) =>
