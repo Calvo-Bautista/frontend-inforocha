@@ -90,7 +90,7 @@ export default function DespachosPage() {
           limit: limit,
         };
         if (statusFilter !== "all") {
-          params.status_filter = statusFilter;
+          params.status = statusFilter;
         }
         if (searchTerm) {
           params.search = searchTerm;
