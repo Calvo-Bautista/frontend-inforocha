@@ -5,10 +5,10 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createClientSchema, editClientSchema } from "@/lib/schemas/clients";
 import { getClientStatus, getClientPriority } from "@/lib/mock-data";
-import { clientsAPI, callLogsAPI } from "@/lib/api";
+import { clientsAPI } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
 import { toast } from "sonner";
-import { LogCallModal } from "@/components/log-call-modal";
+
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -71,7 +71,9 @@ import {
   Printer,
   MoreHorizontal,
   Pencil,
+  Eye,
   Trash2,
+  Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
@@ -103,7 +105,9 @@ export default function ClientesPage() {
   const [clientToEdit, setClientToEdit] = useState(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState(null);
-  const [logs, setLogs] = useState([]);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [clientToView, setClientToView] = useState(null);
+
   const searchParams = useSearchParams();
 
   // Form for creating new client
@@ -139,6 +143,11 @@ export default function ClientesPage() {
   // State for managing printer lists
   const [newPrinters, setNewPrinters] = useState([""]);
   const [editPrinters, setEditPrinters] = useState([""]);
+
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, searchTerm]);
 
   // Fetch clients from API
   useEffect(() => {
@@ -179,23 +188,7 @@ export default function ClientesPage() {
 
   const filteredClients = clients;
 
-  const handleLogCall = (client) => {
-    setSelectedClient(client);
-    setIsModalOpen(true);
-  };
 
-  const handleCallSubmit = async (callLog) => {
-    try {
-      const createdLog = await callLogsAPI.create(callLog);
-      setLogs((prev) => [createdLog, ...prev]);
-      toast.success("Llamada registrada exitosamente");
-    } catch (err) {
-      console.error("Error creating call log:", err);
-      toast.error("Error al registrar llamada", {
-        description: err.message,
-      });
-    }
-  };
 
   const handleNewContactSubmit = async (data) => {
     try {
@@ -287,6 +280,11 @@ export default function ClientesPage() {
     setIsDeleteOpen(true);
   };
 
+  const openDetailsDialog = (client) => {
+    setClientToView(client);
+    setIsDetailsOpen(true);
+  };
+
   const handleDeleteClient = async () => {
     if (!clientToDelete) return;
 
@@ -309,9 +307,7 @@ export default function ClientesPage() {
     }
   };
 
-  const getClientLogs = (clientId) => {
-    return logs.filter((log) => log.clientId === clientId);
-  };
+
 
   const statusFilters = [
     { value: "all", label: "Todos" },
@@ -749,7 +745,7 @@ export default function ClientesPage() {
                   {filteredClients.map((client) => {
                     const clientStatus = getClientStatus(client.status);
                     const clientPriority = getClientPriority(client.priority);
-                    const clientLogs = getClientLogs(client.id);
+
                     return (
                       <TableRow key={client.id}>
                         <TableCell>
@@ -799,11 +795,7 @@ export default function ClientesPage() {
                           <Badge className={statusColorMap[clientStatus.color]}>
                             {clientStatus.label}
                           </Badge>
-                          {clientLogs.length > 0 && (
-                            <span className="ml-2 text-xs text-muted-foreground">
-                              ({clientLogs.length} llamadas)
-                            </span>
-                          )}
+
                         </TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
@@ -814,16 +806,17 @@ export default function ClientesPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openDetailsDialog(client)}>
+                                <Eye className="w-4 h-4 mr-2" />
+                                Ver
+                              </DropdownMenuItem>
                               {(user?.role === "vendedor" || user?.role === "owner") && (
                                 <DropdownMenuItem onClick={() => openEditDialog(client)}>
                                   <Pencil className="w-4 h-4 mr-2" />
                                   Editar
                                 </DropdownMenuItem>
                               )}
-                              <DropdownMenuItem onClick={() => handleLogCall(client)}>
-                                <Phone className="w-4 h-4 mr-2" />
-                                Registrar Llamada
-                              </DropdownMenuItem>
+
                               {(user?.role === "admin" || user?.role === "owner") && (
                                 <>
                                   <DropdownMenuItem
@@ -853,7 +846,7 @@ export default function ClientesPage() {
             filteredClients.map((client) => {
               const clientStatus = getClientStatus(client.status);
               const clientPriority = getClientPriority(client.priority);
-              const clientLogs = getClientLogs(client.id);
+
               return (
                 <Card key={client.id}>
                   <CardContent className="pt-6">
@@ -901,18 +894,8 @@ export default function ClientesPage() {
                         </div>
                       )}
                     </div>
-                    {clientLogs.length > 0 && (
-                      <p className="text-xs text-muted-foreground mb-4">
-                        {clientLogs.length} llamadas registradas
-                      </p>
-                    )}
-                    <Button
-                      className="w-full gap-2"
-                      onClick={() => handleLogCall(client)}
-                    >
-                      <Phone className="w-4 h-4" />
-                      Registrar Llamada
-                    </Button>
+
+
                   </CardContent>
                 </Card>
               );
@@ -944,13 +927,141 @@ export default function ClientesPage() {
           )
         }
 
-        {/* Log Call Modal */}
-        <LogCallModal
-          client={selectedClient}
-          open={isModalOpen}
-          onOpenChange={setIsModalOpen}
-          onSubmit={handleCallSubmit}
-        />
+
+
+
+
+        {/* Client Details Modal */}
+        <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Detalles del Cliente</DialogTitle>
+              <DialogDescription>
+                Información completa del cliente
+              </DialogDescription>
+            </DialogHeader>
+            {clientToView && (
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Nombre</Label>
+                    <p className="text-base font-medium">{clientToView.name}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Legajo</Label>
+                      <p className="text-sm font-mono">{clientToView.legajo || "-"}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Estado</Label>
+                      <div className="mt-1">
+                        <Badge className={statusColorMap[getClientStatus(clientToView.status).color]}>
+                          {getClientStatus(clientToView.status).label}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-4 pt-4 border-t">
+                  <h4 className="font-medium text-sm">Información de Contacto</h4>
+                  <div className="grid gap-4">
+                    <div>
+                      <Label className="text-muted-foreground text-xs flex items-center gap-1">
+                        <Phone className="w-3 h-3" />
+                        Teléfono
+                      </Label>
+                      <p className="text-sm">{clientToView.phone || "-"}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground text-xs flex items-center gap-1">
+                        <Mail className="w-3 h-3" />
+                        Email
+                      </Label>
+                      <p className="text-sm">{clientToView.email || "-"}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground text-xs flex items-center gap-1">
+                        <MapPin className="w-3 h-3" />
+                        Dirección
+                      </Label>
+                      <p className="text-sm">{clientToView.address || "-"}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-4 pt-4 border-t">
+                  <h4 className="font-medium text-sm">Información del Negocio</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-muted-foreground text-xs flex items-center gap-1">
+                        <Building2 className="w-3 h-3" />
+                        Industria
+                      </Label>
+                      <p className="text-sm">{clientToView.industry || "-"}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Prioridad</Label>
+                      <div className="mt-1">
+                        {clientToView.priority ? (
+                          <Badge variant="outline">
+                            {getClientPriority(clientToView.priority).label}
+                          </Badge>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">-</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Proveedor Actual</Label>
+                    <p className="text-sm">{clientToView.proveedorActual || "-"}</p>
+                  </div>
+                </div>
+                <div className="space-y-4 pt-4 border-t">
+                  <h4 className="font-medium text-sm flex items-center gap-1">
+                    <Printer className="w-4 h-4" />
+                    Impresoras
+                  </h4>
+                  {clientToView.printers && clientToView.printers.length > 0 ? (
+                    <div className="space-y-2">
+                      {clientToView.printers.map((printer, index) => (
+                        <div key={index} className="flex items-center gap-2 text-sm bg-muted/50 p-2 rounded">
+                          <Printer className="w-3.5 h-3.5 text-muted-foreground" />
+                          <span>{printer.printer_model}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {clientToView.maquinas || "No hay impresoras registradas"}
+                    </p>
+                  )}
+                </div>
+                {clientToView.notes && (
+                  <div className="space-y-2 pt-4 border-t">
+                    <Label className="text-muted-foreground text-xs">Notas</Label>
+                    <p className="text-sm whitespace-pre-wrap bg-muted/30 p-3 rounded">
+                      {clientToView.notes}
+                    </p>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t text-xs text-muted-foreground">
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Creado</Label>
+                    <p className="text-sm">
+                      {new Date(clientToView.created_at).toLocaleDateString("es-AR")}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Actualizado</Label>
+                    <p className="text-sm">
+                      {new Date(clientToView.updated_at).toLocaleDateString("es-AR")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
@@ -961,7 +1072,7 @@ export default function ClientesPage() {
                 {clientToDelete && (
                   <>
                     Estás a punto de eliminar a <strong>{clientToDelete.name}</strong>.
-                    Esta acción no se puede deshacer y se eliminarán todos los registros de llamadas asociados.
+                    Esta acción no se puede deshacer.
                   </>
                 )}
               </AlertDialogDescription>

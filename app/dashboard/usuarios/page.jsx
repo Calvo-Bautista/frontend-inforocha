@@ -117,6 +117,11 @@ export default function UsuariosPage() {
   const [limit] = useState(8);
   const [totalItems, setTotalItems] = useState(0);
 
+  // Reset page to 1 when search changes
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm]);
+
   // Fetch users from API
   useEffect(() => {
     const fetchUsers = async () => {

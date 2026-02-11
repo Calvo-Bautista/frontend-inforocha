@@ -103,6 +103,11 @@ export default function ProductosPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [categoryFilter, debouncedSearchTerm]);
+
   // Fetch products from API
   useEffect(() => {
     const fetchProducts = async () => {

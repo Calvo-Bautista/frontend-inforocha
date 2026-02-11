@@ -86,6 +86,11 @@ export default function DespachosPage() {
     delivered: 0
   });
 
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, searchTerm]);
+
   // Fetch orders from API
   useEffect(() => {
     const fetchOrders = async () => {
