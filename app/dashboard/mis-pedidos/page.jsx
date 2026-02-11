@@ -49,8 +49,14 @@ export default function MisPedidosPage() {
 
   // Pagination State
   const [page, setPage] = useState(1);
+
   const [limit] = useState(8);
   const [totalItems, setTotalItems] = useState(0);
+  const [stats, setStats] = useState({
+    totalOrders: 0,
+    totalRevenue: 0,
+    pending: 0
+  });
 
   // Fetch orders from API
   useEffect(() => {
@@ -90,6 +96,23 @@ export default function MisPedidosPage() {
     return () => clearTimeout(timer);
   }, [statusFilter, searchTerm, page, limit]);
 
+  // Fetch stats separately
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const data = await ordersAPI.getStats();
+        setStats({
+          totalOrders: data.total_orders,
+          totalRevenue: data.total_revenue,
+          pending: data.by_status.pendiente || 0
+        });
+      } catch (err) {
+        console.error("Error fetching stats:", err);
+      }
+    };
+    fetchStats();
+  }, []);
+
   // Debug: log first order to see structure
   useEffect(() => {
     if (orders.length > 0) {
@@ -110,10 +133,9 @@ export default function MisPedidosPage() {
   ];
 
   // Stats
-  const totalOrders = orders.length;
-  // Calculate revenue based on currently filtered orders
-  const filteredRevenue = filteredOrders.reduce((sum, o) => sum + Number(o.total), 0);
-  const pendingOrders = orders.filter((o) => o.status === "pendiente").length;
+  const totalOrders = stats.totalOrders;
+  const filteredRevenue = stats.totalRevenue;
+  const pendingOrders = stats.pending;
 
   return (
     <div className="space-y-6">
@@ -264,13 +286,28 @@ export default function MisPedidosPage() {
                   </AccordionItem>
                 </Accordion>
 
-                {/* Notes and Factura A */}
-                {(order.notes || order.factura_a) && (
+                {/* Notes, Factura A, and Repair */}
+                {(order.notes || order.factura_a || order.repair_description) && (
                   <div className="mt-3 pt-3 border-t border-border space-y-2">
                     {order.factura_a && (
                       <div className="flex items-center gap-2 text-sm">
                         <FileText className="w-4 h-4 text-primary" />
                         <span className="font-medium">Requiere Factura A</span>
+                      </div>
+                    )}
+                    {order.repair_description && (
+                      <div className="text-sm">
+                        <p className="font-medium text-muted-foreground mb-1">Reparación:</p>
+                        <p className="text-foreground">{order.repair_description}</p>
+                        <p className="text-primary font-medium mt-1">
+                          Cargo: {formatCurrency(order.repair_amount || 0)}
+                        </p>
+                      </div>
+                    )}
+                    {order.payment_method && (
+                      <div className="text-sm">
+                        <p className="font-medium text-muted-foreground mb-1">Método de Pago:</p>
+                        <p className="text-foreground capitalize">{order.payment_method}</p>
                       </div>
                     )}
                     {order.notes && (

@@ -58,6 +58,14 @@ export default function NuevaOrdenPage() {
   const [applyDiscount, setApplyDiscount] = useState(false);
   const [waiveShipping, setWaiveShipping] = useState(false);
 
+  // Repair service states
+  const [includesRepair, setIncludesRepair] = useState(false);
+  const [repairDescription, setRepairDescription] = useState("");
+  const [repairAmount, setRepairAmount] = useState(0);
+
+  // Payment method state
+  const [paymentMethod, setPaymentMethod] = useState("");
+
   // Search states
   const [clientSearchTerm, setClientSearchTerm] = useState("");
   const [productSearchTerm, setProductSearchTerm] = useState("");
@@ -239,11 +247,21 @@ export default function NuevaOrdenPage() {
 
   // Calculate final total
   const cartTotal = useMemo(() => {
-    return cartSubtotal - discountAmount + shippingCost;
-  }, [cartSubtotal, discountAmount, shippingCost]);
+    const repairCost = includesRepair ? parseFloat(repairAmount) || 0 : 0;
+    return cartSubtotal - discountAmount + shippingCost + repairCost;
+  }, [cartSubtotal, discountAmount, shippingCost, includesRepair, repairAmount]);
 
   const handleSubmitOrder = async () => {
-    if (!selectedClient || cartItems.length === 0) return;
+    // Require either products OR repair service
+    if (!selectedClient || (cartItems.length === 0 && !includesRepair)) return;
+
+    // Validate repair fields if repair is included
+    if (includesRepair && (!repairDescription || !repairAmount || parseFloat(repairAmount) <= 0)) {
+      toast.error("Error de validación", {
+        description: "Por favor completa la descripción y el monto de la reparación",
+      });
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -264,6 +282,9 @@ export default function NuevaOrdenPage() {
         total: cartTotal,
         factura_a: wantsFacturaA,
         notes: orderNotes || null,
+        repair_description: includesRepair ? repairDescription : null,
+        repair_amount: includesRepair ? parseFloat(repairAmount) || 0 : 0,
+        payment_method: paymentMethod,
       };
 
       await ordersAPI.create(orderData);
@@ -285,7 +306,13 @@ export default function NuevaOrdenPage() {
     }
   };
 
-  const canSubmit = selectedClient && cartItems.length > 0 && !isSubmitting;
+  // Allow submission if there are products OR if there's a valid repair
+  const hasProducts = cartItems.length > 0;
+  const hasValidRepair = includesRepair &&
+    repairDescription?.trim().length > 0 &&
+    repairAmount &&
+    parseFloat(repairAmount) > 0;
+  const canSubmit = selectedClient && (hasProducts || hasValidRepair) && paymentMethod && !isSubmitting;
 
   if (showSuccess) {
     return (
@@ -438,6 +465,75 @@ export default function NuevaOrdenPage() {
             </CardContent>
           </Card>
 
+          {/* Repair Service Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="w-5 h-5" />
+                Servicio de Reparación
+              </CardTitle>
+              <CardDescription>
+                Agrega un cargo por reparación a esta orden
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-3 p-3 bg-secondary/30 rounded-lg">
+                <Checkbox
+                  id="includesRepair"
+                  checked={includesRepair}
+                  onCheckedChange={(checked) => {
+                    setIncludesRepair(checked);
+                    if (!checked) {
+                      setRepairDescription("");
+                      setRepairAmount(0);
+                    }
+                  }}
+                />
+                <Label htmlFor="includesRepair" className="cursor-pointer font-normal">
+                  ¿Incluye servicio de reparación?
+                </Label>
+              </div>
+
+              {includesRepair && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="repairDescription">Descripción del Servicio *</Label>
+                    <Textarea
+                      id="repairDescription"
+                      placeholder="Ej: Reparación de impresora HP LaserJet, cambio de fusor..."
+                      value={repairDescription}
+                      onChange={(e) => setRepairDescription(e.target.value)}
+                      rows={3}
+                      required={includesRepair}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="repairAmount">Monto del Servicio *</Label>
+                    <Input
+                      id="repairAmount"
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      placeholder="0.00"
+                      value={repairAmount}
+                      onChange={(e) => setRepairAmount(e.target.value)}
+                      required={includesRepair}
+                    />
+                  </div>
+
+                  {repairAmount > 0 && (
+                    <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                      <p className="text-sm font-medium text-primary">
+                        Cargo por reparación: {formatCurrency(parseFloat(repairAmount) || 0)}
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Add Products Card */}
           <Card>
             <CardHeader>
@@ -569,60 +665,62 @@ export default function NuevaOrdenPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {cartItems.length === 0 ? (
+              {cartItems.length === 0 && !hasValidRepair ? (
                 <div className="text-center py-8">
                   <ShoppingCart className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
                   <p className="text-muted-foreground">
-                    Agrega productos al carrito para crear la orden
+                    Agrega productos al carrito o incluye un servicio de reparación
                   </p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {/* Cart Items */}
-                  <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
-                    {cartItems.map((item) => (
-                      <div
-                        key={item.productId}
-                        className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">
-                            {item.productName}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatCurrency(item.price)} c/u
+                  {cartItems.length > 0 && (
+                    <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                      {cartItems.map((item) => (
+                        <div
+                          key={item.productId}
+                          className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">
+                              {item.productName}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatCurrency(item.price)} c/u
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              min={1}
+                              max={item.stock}
+                              value={item.quantity}
+                              onChange={(e) =>
+                                handleUpdateQuantity(
+                                  item.productId,
+                                  parseInt(e.target.value) || 1
+                                )
+                              }
+                              className="w-16 h-8 text-center text-sm"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => handleRemoveFromCart(item.productId)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              <span className="sr-only">Eliminar</span>
+                            </Button>
+                          </div>
+                          <p className="text-sm font-medium w-24 text-right">
+                            {formatCurrency(item.price * item.quantity)}
                           </p>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            min={1}
-                            max={item.stock}
-                            value={item.quantity}
-                            onChange={(e) =>
-                              handleUpdateQuantity(
-                                item.productId,
-                                parseInt(e.target.value) || 1
-                              )
-                            }
-                            className="w-16 h-8 text-center text-sm"
-                          />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => handleRemoveFromCart(item.productId)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            <span className="sr-only">Eliminar</span>
-                          </Button>
-                        </div>
-                        <p className="text-sm font-medium w-24 text-right">
-                          {formatCurrency(item.price * item.quantity)}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Discount Options */}
                   <div className="border-t border-border pt-4 space-y-3">
@@ -638,15 +736,15 @@ export default function NuevaOrdenPage() {
                           id="discount"
                           checked={applyDiscount}
                           onCheckedChange={setApplyDiscount}
-                          disabled={availableDiscountPercent === 0}
+                          disabled={availableDiscountPercent === 0 || cartItems.length === 0}
                         />
                         <div className="flex items-center gap-2">
                           <Percent className="w-4 h-4 text-muted-foreground" />
                           <Label htmlFor="discount" className={cn(
                             "cursor-pointer font-normal text-sm",
-                            availableDiscountPercent === 0 && "text-muted-foreground"
+                            availableDiscountPercent === 0 || cartItems.length === 0 && "text-muted-foreground"
                           )}>
-                            {availableDiscountPercent > 0
+                            {availableDiscountPercent > 0 && cartItems.length > 0
                               ? `Aplicar ${availableDiscountPercent}% descuento`
                               : "Descuento no disponible"
                             }
@@ -694,6 +792,23 @@ export default function NuevaOrdenPage() {
                         </span>
                       )}
                     </div>
+
+                    {/* Payment Method */}
+                    <div className="p-3 bg-secondary/30 rounded-lg space-y-2">
+                      <Label htmlFor="paymentMethod" className="text-sm font-medium">
+                        Método de Pago *
+                      </Label>
+                      <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                        <SelectTrigger id="paymentMethod">
+                          <SelectValue placeholder="Selecciona un método de pago" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="efectivo">Efectivo</SelectItem>
+                          <SelectItem value="transferencia">Transferencia</SelectItem>
+                          <SelectItem value="tarjeta">Tarjeta</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
                   {/* Summary */}
@@ -718,6 +833,11 @@ export default function NuevaOrdenPage() {
                       <span>Total</span>
                       <span>{formatCurrency(cartTotal)}</span>
                     </div>
+                    {includesRepair && repairAmount > 0 && (
+                      <div className="text-xs text-muted-foreground">
+                        Incluye reparación: {formatCurrency(parseFloat(repairAmount) || 0)}
+                      </div>
+                    )}
                     {wantsFacturaA && (
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <FileText className="w-3 h-3" />
@@ -732,6 +852,24 @@ export default function NuevaOrdenPage() {
                       <AlertCircle className="w-4 h-4 text-warning shrink-0" />
                       <span className="text-warning">
                         Selecciona un cliente para confirmar la orden
+                      </span>
+                    </div>
+                  )}
+
+                  {selectedClient && !hasProducts && !hasValidRepair && (
+                    <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg text-sm">
+                      <AlertCircle className="w-4 h-4 text-warning shrink-0" />
+                      <span className="text-warning">
+                        Agrega productos al carrito o incluye un servicio de reparación
+                      </span>
+                    </div>
+                  )}
+
+                  {selectedClient && (hasProducts || hasValidRepair) && !paymentMethod && (
+                    <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg text-sm">
+                      <AlertCircle className="w-4 h-4 text-warning shrink-0" />
+                      <span className="text-warning">
+                        Selecciona un método de pago para continuar
                       </span>
                     </div>
                   )}

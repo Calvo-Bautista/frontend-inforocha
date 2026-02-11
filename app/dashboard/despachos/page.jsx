@@ -79,6 +79,12 @@ export default function DespachosPage() {
 
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [stats, setStats] = useState({
+    pending: 0,
+    inPreparation: 0,
+    shipped: 0,
+    delivered: 0
+  });
 
   // Fetch orders from API
   useEffect(() => {
@@ -119,6 +125,24 @@ export default function DespachosPage() {
     return () => clearTimeout(timer);
   }, [statusFilter, searchTerm, page, limit]);
 
+  // Fetch stats separately (only once on mount or when needed)
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const data = await ordersAPI.getStats();
+        setStats({
+          pending: data.by_status.pendiente || 0,
+          inPreparation: data.by_status.preparacion || 0,
+          shipped: data.by_status.enviado || 0,
+          delivered: data.by_status.entregado || 0
+        });
+      } catch (err) {
+        console.error("Error fetching stats:", err);
+      }
+    };
+    fetchStats();
+  }, []);
+
   const shippableOrders = useMemo(() => {
     return ordersList;
   }, [ordersList]);
@@ -153,10 +177,10 @@ export default function DespachosPage() {
     };
   }, [shippableOrders]);
 
-  const pending = ordersByStatus.pendiente.length;
-  const inPreparation = ordersByStatus.preparacion.length;
-  const shipped = ordersByStatus.enviado.length;
-  const delivered = ordersByStatus.entregado.length;
+  const pending = stats.pending;
+  const inPreparation = stats.inPreparation;
+  const shipped = stats.shipped;
+  const delivered = stats.delivered;
 
   const openDetail = (order) => {
     setSelectedOrder(order);
@@ -414,15 +438,35 @@ export default function DespachosPage() {
                     </Table>
                   </div>
 
-                  {/* Notes if any */}
-                  {order.notes && (
-                    <div className="px-4 pb-4">
-                      <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg">
-                        <p className="text-sm flex items-start gap-2">
-                          <MessageSquare className="w-4 h-4 mt-0.5 text-warning shrink-0" />
-                          <span><strong>Nota:</strong> {order.notes}</span>
-                        </p>
-                      </div>
+                  {/* Notes and Repair if any */}
+                  {(order.notes || order.repair_description) && (
+                    <div className="px-4 pb-4 space-y-3">
+                      {order.repair_description && (
+                        <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                          <p className="text-sm flex items-start gap-2">
+                            <Package className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+                            <span><strong>Reparación:</strong> {order.repair_description}</span>
+                          </p>
+                          <p className="text-sm font-medium text-primary mt-2 ml-6">
+                            Cargo: {formatCurrency(order.repair_amount || 0)}
+                          </p>
+                        </div>
+                      )}
+                      {order.payment_method && (
+                        <div className="p-3 bg-secondary/30 border border-border rounded-lg">
+                          <p className="text-sm flex items-start gap-2">
+                            <span><strong>Método de Pago:</strong> <span className="capitalize">{order.payment_method}</span></span>
+                          </p>
+                        </div>
+                      )}
+                      {order.notes && (
+                        <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg">
+                          <p className="text-sm flex items-start gap-2">
+                            <MessageSquare className="w-4 h-4 mt-0.5 text-warning shrink-0" />
+                            <span><strong>Nota:</strong> {order.notes}</span>
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </CardContent>
@@ -583,6 +627,12 @@ export default function DespachosPage() {
                         <span>{formatCurrency(selectedOrder.shipping)}</span>
                       )}
                     </div>
+                    {selectedOrder.repair_amount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Reparación:</span>
+                        <span>{formatCurrency(selectedOrder.repair_amount)}</span>
+                      </div>
+                    )}
                     <div className="border-t border-border pt-2 mt-2">
                       <div className="flex justify-between font-bold text-lg">
                         <span>Total:</span>
@@ -593,13 +643,32 @@ export default function DespachosPage() {
                 </CardContent>
               </Card>
 
-              {/* Notes */}
-              {selectedOrder.notes && (
-                <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg">
-                  <p className="text-sm flex items-start gap-2">
-                    <MessageSquare className="w-4 h-4 mt-0.5 text-warning shrink-0" />
-                    <span><strong>Notas del pedido:</strong> {selectedOrder.notes}</span>
-                  </p>
+              {/* Notes, Repair, and Payment Method */}
+              {(selectedOrder.notes || selectedOrder.repair_description || selectedOrder.payment_method) && (
+                <div className="space-y-3">
+                  {selectedOrder.repair_description && (
+                    <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
+                      <p className="text-sm flex items-start gap-2">
+                        <Package className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+                        <span><strong>Reparación:</strong> {selectedOrder.repair_description}</span>
+                      </p>
+                    </div>
+                  )}
+                  {selectedOrder.payment_method && (
+                    <div className="p-4 bg-secondary/30 border border-border rounded-lg">
+                      <p className="text-sm">
+                        <strong>Método de Pago:</strong> <span className="capitalize">{selectedOrder.payment_method}</span>
+                      </p>
+                    </div>
+                  )}
+                  {selectedOrder.notes && (
+                    <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg">
+                      <p className="text-sm flex items-start gap-2">
+                        <MessageSquare className="w-4 h-4 mt-0.5 text-warning shrink-0" />
+                        <span><strong>Notas del pedido:</strong> {selectedOrder.notes}</span>
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

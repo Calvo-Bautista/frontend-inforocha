@@ -136,6 +136,10 @@ export default function ClientesPage() {
     resolver: zodResolver(editClientSchema),
   });
 
+  // State for managing printer lists
+  const [newPrinters, setNewPrinters] = useState([""]);
+  const [editPrinters, setEditPrinters] = useState([""]);
+
   // Fetch clients from API
   useEffect(() => {
     const fetchClients = async () => {
@@ -197,13 +201,19 @@ export default function ClientesPage() {
     try {
       const clientData = {
         ...data,
-        tipo_cliente: data.tipoCliente,
+        priority: data.tipoCliente || null,
         proveedor_actual: data.proveedorActual,
+        printers: newPrinters.filter(p => p.trim() !== ""),  // Only send non-empty printers
       };
+      // Remove old fields
+      delete clientData.tipoCliente;
+      delete clientData.proveedorActual;
+      delete clientData.maquinas;
 
       const createdClient = await clientsAPI.create(clientData);
       setClients((prev) => [...prev, createdClient]);
       resetNew();
+      setNewPrinters([""]);
       setIsNewContactOpen(false);
       toast.success("Cliente creado exitosamente");
     } catch (err) {
@@ -222,10 +232,21 @@ export default function ClientesPage() {
       address: client.address || "",
       industry: client.industry || "",
       maquinas: client.maquinas || "",
-      tipoCliente: client.tipo_cliente || "",
+      tipoCliente: client.priority || "",
       proveedorActual: client.proveedor_actual || "",
       status: client.status || "prospect",
     });
+
+    // Populate printers from client.printers array or fallback to maquinas
+    if (client.printers && client.printers.length > 0) {
+      setEditPrinters(client.printers.map(p => p.printer_model));
+    } else if (client.maquinas) {
+      // Fallback: split maquinas string by comma
+      setEditPrinters(client.maquinas.split(',').map(p => p.trim()).filter(p => p));
+    } else {
+      setEditPrinters([""]);
+    }
+
     setIsEditOpen(true);
   };
 
@@ -235,9 +256,14 @@ export default function ClientesPage() {
     try {
       const clientData = {
         ...data,
-        tipo_cliente: data.tipoCliente,
+        priority: data.tipoCliente || null,
         proveedor_actual: data.proveedorActual,
+        printers: editPrinters.filter(p => p.trim() !== ""),  // Only send non-empty printers
       };
+      // Remove old fields
+      delete clientData.tipoCliente;
+      delete clientData.proveedorActual;
+      delete clientData.maquinas;
 
       const updatedClient = await clientsAPI.update(clientToEdit.id, clientData);
 
@@ -377,35 +403,62 @@ export default function ClientesPage() {
                     )}
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="maquinas">Máquinas (Marca/Modelo)</Label>
-                    <Input
-                      id="maquinas"
-                      {...registerNew("maquinas")}
-                      placeholder="Ej: HP LaserJet Pro M15w, Brother HL-1110"
-                    />
-                    {errorsNew.maquinas && (
-                      <p className="text-sm text-destructive">
-                        {errorsNew.maquinas.message}
-                      </p>
-                    )}
+                    <Label>Impresoras (Marca/Modelo)</Label>
+                    {newPrinters.map((printer, index) => (
+                      <div key={index} className="flex gap-2">
+                        <Input
+                          value={printer}
+                          onChange={(e) => {
+                            const updated = [...newPrinters];
+                            updated[index] = e.target.value;
+                            setNewPrinters(updated);
+                          }}
+                          placeholder="Ej: HP LaserJet Pro M15w"
+                        />
+                        {newPrinters.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={() => {
+                              setNewPrinters(newPrinters.filter((_, i) => i !== index));
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setNewPrinters([...newPrinters, ""])}
+                      className="w-full"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Agregar Impresora
+                    </Button>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4">
                     <div className="grid gap-2">
                       <Label htmlFor="tipoCliente">Tipo de Cliente</Label>
                       <Select
                         onValueChange={(value) => {
-                          const event = { target: { name: "tipoCliente", value } };
+                          const finalValue = value === "unspecified" ? "" : value;
+                          const event = { target: { name: "tipoCliente", value: finalValue } };
                           registerNew("tipoCliente").onChange(event);
                         }}
-                        defaultValue=""
+                        defaultValue="unspecified"
                       >
                         <SelectTrigger id="tipoCliente">
                           <SelectValue placeholder="Seleccionar..." />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="alta">Alta Prioridad (1/mes)</SelectItem>
-                          <SelectItem value="media">Media Prioridad (1 cada 2-3 meses)</SelectItem>
-                          <SelectItem value="baja">Baja Prioridad (1 cada 6+ meses)</SelectItem>
+                          <SelectItem value="unspecified">Sin especificar</SelectItem>
+                          <SelectItem value="ALTA">Alta Prioridad (1/mes)</SelectItem>
+                          <SelectItem value="MEDIA">Media Prioridad (1 cada 2-3 meses)</SelectItem>
+                          <SelectItem value="BAJA">Baja Prioridad (1 cada 6+ meses)</SelectItem>
                         </SelectContent>
                       </Select>
                       {errorsNew.tipoCliente && (
@@ -424,6 +477,29 @@ export default function ClientesPage() {
                       {errorsNew.proveedorActual && (
                         <p className="text-sm text-destructive">
                           {errorsNew.proveedorActual.message}
+                        </p>
+                      )}
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="status">Estado *</Label>
+                      <Select
+                        onValueChange={(value) => {
+                          const event = { target: { name: "status", value } };
+                          registerNew("status").onChange(event);
+                        }}
+                        defaultValue="prospect"
+                      >
+                        <SelectTrigger id="status">
+                          <SelectValue placeholder="Seleccionar estado..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="prospect">Prospecto</SelectItem>
+                          <SelectItem value="active">Cliente Activo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {errorsNew.status && (
+                        <p className="text-sm text-destructive">
+                          {errorsNew.status.message}
                         </p>
                       )}
                     </div>
@@ -503,34 +579,62 @@ export default function ClientesPage() {
                     )}
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="edit-maquinas">Máquinas (Marca/Modelo)</Label>
-                    <Input
-                      id="edit-maquinas"
-                      {...registerEdit("maquinas")}
-                    />
-                    {errorsEdit.maquinas && (
-                      <p className="text-sm text-destructive">
-                        {errorsEdit.maquinas.message}
-                      </p>
-                    )}
+                    <Label>Impresoras (Marca/Modelo)</Label>
+                    {editPrinters.map((printer, index) => (
+                      <div key={index} className="flex gap-2">
+                        <Input
+                          value={printer}
+                          onChange={(e) => {
+                            const updated = [...editPrinters];
+                            updated[index] = e.target.value;
+                            setEditPrinters(updated);
+                          }}
+                          placeholder="Ej: HP LaserJet Pro M15w"
+                        />
+                        {editPrinters.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={() => {
+                              setEditPrinters(editPrinters.filter((_, i) => i !== index));
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditPrinters([...editPrinters, ""])}
+                      className="w-full"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Agregar Impresora
+                    </Button>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4">
                     <div className="grid gap-2">
                       <Label htmlFor="edit-tipoCliente">Tipo de Cliente</Label>
                       <Select
                         onValueChange={(value) => {
-                          const event = { target: { name: "tipoCliente", value } };
+                          const finalValue = value === "unspecified" ? "" : value;
+                          const event = { target: { name: "tipoCliente", value: finalValue } };
                           registerEdit("tipoCliente").onChange(event);
                         }}
-                        defaultValue=""
+                        defaultValue={clientToEdit?.priority || "unspecified"}
                       >
                         <SelectTrigger id="edit-tipoCliente">
                           <SelectValue placeholder="Seleccionar..." />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="alta">Alta Prioridad (1/mes)</SelectItem>
-                          <SelectItem value="media">Media Prioridad (1 cada 2-3 meses)</SelectItem>
-                          <SelectItem value="baja">Baja Prioridad (1 cada 6+ meses)</SelectItem>
+                          <SelectItem value="unspecified">Sin especificar</SelectItem>
+                          <SelectItem value="ALTA">Alta Prioridad (1/mes)</SelectItem>
+                          <SelectItem value="MEDIA">Media Prioridad (1 cada 2-3 meses)</SelectItem>
+                          <SelectItem value="BAJA">Baja Prioridad (1 cada 6+ meses)</SelectItem>
                         </SelectContent>
                       </Select>
                       {errorsEdit.tipoCliente && (
@@ -644,7 +748,7 @@ export default function ClientesPage() {
                 <TableBody>
                   {filteredClients.map((client) => {
                     const clientStatus = getClientStatus(client.status);
-                    const clientPriority = getClientPriority(client.tipo_cliente);
+                    const clientPriority = getClientPriority(client.priority);
                     const clientLogs = getClientLogs(client.id);
                     return (
                       <TableRow key={client.id}>
@@ -671,12 +775,14 @@ export default function ClientesPage() {
                           <div className="flex items-center gap-2 max-w-xs">
                             <Printer className="w-4 h-4 text-muted-foreground shrink-0" />
                             <span className="truncate text-sm">
-                              {client.maquinas || "-"}
+                              {client.printers && client.printers.length > 0
+                                ? client.printers.map(p => p.printer_model).join(", ")
+                                : client.maquinas || "-"}
                             </span>
                           </div>
                         </TableCell>
                         <TableCell>
-                          {client.tipo_cliente ? (
+                          {client.priority ? (
                             <Badge className={statusColorMap[clientPriority.color]}>
                               {clientPriority.label}
                             </Badge>
@@ -746,7 +852,7 @@ export default function ClientesPage() {
           {
             filteredClients.map((client) => {
               const clientStatus = getClientStatus(client.status);
-              const clientPriority = getClientPriority(client.tipoCliente);
+              const clientPriority = getClientPriority(client.priority);
               const clientLogs = getClientLogs(client.id);
               return (
                 <Card key={client.id}>
@@ -783,7 +889,11 @@ export default function ClientesPage() {
                       </div>
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Printer className="w-4 h-4 shrink-0" />
-                        <span className="truncate">{client.maquinas || "-"}</span>
+                        <span className="truncate">
+                          {client.printers && client.printers.length > 0
+                            ? client.printers.map(p => p.printer_model).join(", ")
+                            : client.maquinas || "-"}
+                        </span>
                       </div>
                       {client.proveedorActual && (
                         <div className="text-muted-foreground">
