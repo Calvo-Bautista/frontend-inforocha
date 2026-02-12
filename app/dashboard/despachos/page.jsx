@@ -49,6 +49,7 @@ import {
   Percent,
   MessageSquare,
   Search,
+  FileDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -168,6 +169,27 @@ export default function DespachosPage() {
     } catch (err) {
       console.error("Error updating order status:", err);
       toast.error("Error al actualizar estado", {
+        description: err.message,
+      });
+    }
+  };
+
+
+  const handleDownloadRemito = async (orderId, orderNumber) => {
+    try {
+      const blob = await ordersAPI.downloadRemito(orderId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Remito-${orderNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success("Remito descargado");
+    } catch (err) {
+      console.error("Error downloading remito:", err);
+      toast.error("Error al descargar remito", {
         description: err.message,
       });
     }
@@ -364,6 +386,15 @@ export default function DespachosPage() {
                           <Eye className="w-4 h-4" />
                           Ver Detalle
                         </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2 bg-transparent"
+                          onClick={() => handleDownloadRemito(order.id, order.order_number)}
+                        >
+                          <FileDown className="w-4 h-4" />
+                          Remito
+                        </Button>
                         <Select
                           value={order.status}
                           onValueChange={(value) =>
@@ -500,6 +531,17 @@ export default function DespachosPage() {
                 <Badge className={statusColorMap[getOrderStatus(selectedOrder.status).color]}>
                   {getOrderStatus(selectedOrder.status).label}
                 </Badge>
+              )}
+              {selectedOrder && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 ml-auto"
+                  onClick={() => handleDownloadRemito(selectedOrder.id, selectedOrder.order_number)}
+                >
+                  <FileDown className="w-4 h-4" />
+                  Descargar Remito
+                </Button>
               )}
             </DialogTitle>
           </DialogHeader>
