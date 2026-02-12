@@ -79,7 +79,7 @@ export function Sidebar() {
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="font-semibold text-sidebar-foreground truncate">
-              Informática Rocha
+              Mayorista Rocha
             </h2>
             <p className="text-xs text-sidebar-foreground/60 truncate">
               {user.name}
@@ -142,7 +142,7 @@ export function Sidebar() {
         <Button
           variant="ghost"
           size="icon"
-          className="text-sidebar-foreground"
+          className="text-sidebar-foreground hover:bg-white/10 hover:text-sidebar-foreground"
           onClick={() => setIsMobileOpen(true)}
         >
           <Menu className="w-6 h-6" />
@@ -158,7 +158,7 @@ export function Sidebar() {
             />
           </div>
           <span className="font-semibold text-sidebar-foreground">
-            Informática Rocha
+            Mayorista Rocha
           </span>
         </div>
       </div>
@@ -181,7 +181,7 @@ export function Sidebar() {
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-3 right-3 text-sidebar-foreground"
+          className="absolute top-3 right-3 text-sidebar-foreground hover:bg-white/10 hover:text-sidebar-foreground"
           onClick={() => setIsMobileOpen(false)}
         >
           <X className="w-5 h-5" />

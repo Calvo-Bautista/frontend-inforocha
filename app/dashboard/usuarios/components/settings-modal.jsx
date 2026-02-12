@@ -152,12 +152,12 @@ export default function SettingsModal({ isOpen, onClose }) {
                     <form onSubmit={handleSubmit(onSubmit)} className="flex-1 flex flex-col min-h-0">
                         <Tabs defaultValue="costs" className="flex-1 flex flex-col min-h-0">
                             <div className="px-6 border-b">
-                                <TabsList className="bg-transparent border-b-0 gap-6 h-12">
-                                    <TabsTrigger value="costs" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none shadow-none px-0 h-11">
+                                <TabsList className="bg-transparent border-b-0 w-full justify-start overflow-x-auto h-auto p-0 gap-6">
+                                    <TabsTrigger value="costs" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none shadow-none px-0 pb-3 pt-2 h-auto shrink-0">
                                         <Percent className="w-4 h-4 mr-2" />
                                         Precios y Descuentos
                                     </TabsTrigger>
-                                    <TabsTrigger value="permissions" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none shadow-none px-0 h-11">
+                                    <TabsTrigger value="permissions" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none shadow-none px-0 pb-3 pt-2 h-auto shrink-0">
                                         <Shield className="w-4 h-4 mr-2" />
                                         Permisos por Rol
                                     </TabsTrigger>
@@ -246,8 +246,8 @@ export default function SettingsModal({ isOpen, onClose }) {
                                 </TabsContent>
 
                                 <TabsContent value="permissions" className="h-full m-0 p-6 overflow-y-auto">
-                                    <div className="border rounded-lg overflow-hidden">
-                                        <table className="w-full text-sm">
+                                    <div className="border rounded-lg overflow-x-auto">
+                                        <table className="w-full text-sm min-w-[600px]">
                                             <thead className="bg-secondary/50 border-b">
                                                 <tr>
                                                     <th className="p-3 text-left font-semibold">Módulo / Permiso</th>

@@ -851,25 +851,59 @@ export default function ClientesPage() {
                 <Card key={client.id}>
                   <CardContent className="pt-6">
                     <div className="flex items-start justify-between gap-4 mb-4">
-                      <div>
-                        <h3 className="font-medium text-foreground">
-                          {client.name}
-                        </h3>
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between">
+                          <h3 className="font-medium text-foreground">
+                            {client.name}
+                          </h3>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 -mt-1 -mr-2">
+                                <MoreHorizontal className="w-4 h-4" />
+                                <span className="sr-only">Abrir menú</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openDetailsDialog(client)}>
+                                <Eye className="w-4 h-4 mr-2" />
+                                Ver
+                              </DropdownMenuItem>
+                              {(user?.role === "vendedor" || user?.role === "owner") && (
+                                <DropdownMenuItem onClick={() => openEditDialog(client)}>
+                                  <Pencil className="w-4 h-4 mr-2" />
+                                  Editar
+                                </DropdownMenuItem>
+                              )}
+
+                              {(user?.role === "admin" || user?.role === "owner") && (
+                                <>
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={() => confirmDelete(client)}
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Eliminar
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                         <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
                           <Building2 className="w-3.5 h-3.5" />
                           {client.industry || "-"}
                         </div>
                       </div>
-                      <div className="flex flex-col gap-1 items-end">
-                        <Badge className={statusColorMap[clientStatus.color]}>
-                          {clientStatus.label}
+                    </div>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      <Badge className={statusColorMap[clientStatus.color]}>
+                        {clientStatus.label}
+                      </Badge>
+                      {client.tipoCliente && (
+                        <Badge variant="outline" className="text-xs">
+                          {clientPriority.label}
                         </Badge>
-                        {client.tipoCliente && (
-                          <Badge variant="outline" className="text-xs">
-                            {clientPriority.label}
-                          </Badge>
-                        )}
-                      </div>
+                      )}
                     </div>
                     <div className="space-y-2 text-sm mb-4">
                       <div className="flex items-center gap-2 text-muted-foreground">

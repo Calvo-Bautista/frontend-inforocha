@@ -267,7 +267,7 @@ export default function DespachosPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="hidden md:grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
@@ -443,7 +443,7 @@ export default function DespachosPage() {
                   </div>
 
                   {/* Products table */}
-                  <div className="px-4 pb-4">
+                  <div className="px-4 pb-4 overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>

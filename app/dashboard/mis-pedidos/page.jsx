@@ -22,6 +22,20 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Search,
   ClipboardList,
   Calendar,
@@ -30,6 +44,12 @@ import {
   TrendingUp,
   FileText,
   FileDown,
+  Eye,
+  MapPin,
+  Phone,
+  Receipt,
+  Percent,
+  MessageSquare
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
@@ -47,7 +67,12 @@ export default function MisPedidosPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+
   const searchParams = useSearchParams();
+
+  // Detail Modal State
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   // Pagination State
   const [page, setPage] = useState(1);
@@ -164,6 +189,16 @@ export default function MisPedidosPage() {
     }
   };
 
+  const openDetail = (order) => {
+    setSelectedOrder(order);
+    setIsDetailOpen(true);
+  };
+
+  const getTotalItems = (items) => {
+    if (!items) return 0;
+    return items.reduce((acc, item) => acc + item.quantity, 0);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -175,7 +210,7 @@ export default function MisPedidosPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="hidden md:grid gap-4 sm:grid-cols-3">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
@@ -261,6 +296,18 @@ export default function MisPedidosPage() {
                     </Badge>
                   </div>
                   <div className="flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openDetail(order);
+                      }}
+                    >
+                      <Eye className="w-4 h-4" />
+                      Ver Detalle
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -371,21 +418,228 @@ export default function MisPedidosPage() {
         totalPages={Math.ceil(totalItems / limit)}
         onPageChange={setPage}
         totalItems={totalItems}
+
         itemsPerPage={limit}
       />
 
+      {/* Order Detail Modal */}
+      <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <span>Detalle del Pedido {selectedOrder?.order_number || selectedOrder?.id}</span>
+              {selectedOrder && (
+                <Badge className={statusColorMap[getOrderStatus(selectedOrder.status).color]}>
+                  {getOrderStatus(selectedOrder.status).label}
+                </Badge>
+              )}
+              {selectedOrder && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 ml-auto mr-8"
+                  onClick={() => handleDownloadRemito(selectedOrder.id, selectedOrder.order_number)}
+                >
+                  <FileDown className="w-4 h-4" />
+                  Descargar Remito
+                </Button>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedOrder && (
+            <div className="space-y-6 mt-4">
+              {/* Client Info */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Información del Cliente
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <p className="font-semibold text-lg">{selectedOrder.client?.name || "Sin Nombre"}</p>
+                    <p className="text-sm flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-muted-foreground" />
+                      {selectedOrder.client?.phone || "Sin Teléfono"}
+                    </p>
+                    <p className="text-sm flex items-start gap-2">
+                      <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
+                      {selectedOrder.client?.address || "Sin Dirección"}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Información del Pedido
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <p className="text-sm flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-muted-foreground" />
+                      {selectedOrder.created_at ? new Date(selectedOrder.created_at).toLocaleDateString("es-AR", {
+                        weekday: "long",
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit"
+                      }) : "Fecha inválida"}
+                    </p>
+                    <p className="text-sm flex items-center gap-2">
+                      <User className="w-4 h-4 text-muted-foreground" />
+                      Vendedor: {selectedOrder.seller?.name || "Desconocido"}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      {selectedOrder.factura_a ? (
+                        <Badge className="bg-primary text-primary-foreground">
+                          <FileText className="w-3 h-3 mr-1" />
+                          Requiere Factura A
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">
+                          Sin Factura A
+                        </Badge>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Products */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Package className="w-4 h-4" />
+                    Productos ({getTotalItems(selectedOrder.items)} unidades)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>SKU</TableHead>
+                        <TableHead>Producto</TableHead>
+                        <TableHead className="text-center">Cant.</TableHead>
+                        <TableHead className="text-right">Subtotal</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedOrder.items.map((item, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell className="font-mono text-xs">{item.product?.sku || "N/A"}</TableCell>
+                          <TableCell className="font-medium">{item.product?.name || "Eliminado"}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="secondary" className="font-bold text-base">
+                              {item.quantity}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(item.price_at_time * item.quantity)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              {/* Pricing Summary */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Receipt className="w-4 h-4" />
+                    Resumen de Precios
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Subtotal:</span>
+                      <span>{formatCurrency(selectedOrder.subtotal)}</span>
+                    </div>
+                    {selectedOrder.discount_percent > 0 && (
+                      <div className="flex justify-between text-sm text-success">
+                        <span className="flex items-center gap-1">
+                          <Percent className="w-3 h-3" />
+                          Descuento ({selectedOrder.discount_percent}%):
+                        </span>
+                        <span>-{formatCurrency(selectedOrder.discount)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Envío:</span>
+                      {selectedOrder.shipping_discount ? (
+                        <span className="text-success">Bonificado</span>
+                      ) : (
+                        <span>{formatCurrency(selectedOrder.shipping)}</span>
+                      )}
+                    </div>
+                    {selectedOrder.repair_amount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Reparación:</span>
+                        <span>{formatCurrency(selectedOrder.repair_amount)}</span>
+                      </div>
+                    )}
+                    <div className="border-t border-border pt-2 mt-2">
+                      <div className="flex justify-between font-bold text-lg">
+                        <span>Total:</span>
+                        <span className="text-primary">{formatCurrency(selectedOrder.total)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Notes, Repair, and Payment Method */}
+              {(selectedOrder.notes || selectedOrder.repair_description || selectedOrder.payment_method) && (
+                <div className="space-y-3">
+                  {selectedOrder.repair_description && (
+                    <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
+                      <p className="text-sm flex items-start gap-2">
+                        <Package className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+                        <span><strong>Reparación:</strong> {selectedOrder.repair_description}</span>
+                      </p>
+                    </div>
+                  )}
+                  {selectedOrder.payment_method && (
+                    <div className="p-4 bg-secondary/30 border border-border rounded-lg">
+                      <p className="text-sm">
+                        <strong>Método de Pago:</strong> <span className="capitalize">{selectedOrder.payment_method}</span>
+                      </p>
+                    </div>
+                  )}
+                  {selectedOrder.notes && (
+                    <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg">
+                      <p className="text-sm flex items-start gap-2">
+                        <MessageSquare className="w-4 h-4 mt-0.5 text-warning shrink-0" />
+                        <span><strong>Notas del pedido:</strong> {selectedOrder.notes}</span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Empty State */}
-      {filteredOrders.length === 0 && (
-        <div className="text-center py-12">
-          <ClipboardList className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-foreground mb-1">
-            No se encontraron pedidos
-          </h3>
-          <p className="text-muted-foreground">
-            Intenta con otros términos de búsqueda o cambia el filtro de estado
-          </p>
-        </div>
-      )}
-    </div>
+      {
+        filteredOrders.length === 0 && (
+          <div className="text-center py-12">
+            <ClipboardList className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-foreground mb-1">
+              No se encontraron pedidos
+            </h3>
+            <p className="text-muted-foreground">
+              Intenta con otros términos de búsqueda o cambia el filtro de estado
+            </p>
+          </div>
+        )
+      }
+    </div >
   );
 }
