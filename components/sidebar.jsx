@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { cn } from "@/lib/utils";
@@ -67,8 +68,14 @@ export function Sidebar() {
     <>
       <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-sidebar-primary rounded-lg flex items-center justify-center">
-            <Printer className="w-5 h-5 text-sidebar-primary-foreground" />
+          <div className="w-10 h-10 flex items-center justify-center bg-black rounded-lg p-1">
+            <Image
+              src="/Logo.png"
+              alt="Logo Rocha"
+              width={40}
+              height={40}
+              className="object-contain"
+            />
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="font-semibold text-sidebar-foreground truncate">
@@ -142,7 +149,14 @@ export function Sidebar() {
           <span className="sr-only">Abrir menú</span>
         </Button>
         <div className="flex items-center gap-2 ml-3">
-          <Printer className="w-5 h-5 text-sidebar-primary" />
+          <div className="w-8 h-8 relative bg-black rounded p-1">
+            <Image
+              src="/Logo.png"
+              alt="Logo Rocha"
+              fill
+              className="object-contain"
+            />
+          </div>
           <span className="font-semibold text-sidebar-foreground">
             Informática Rocha
           </span>

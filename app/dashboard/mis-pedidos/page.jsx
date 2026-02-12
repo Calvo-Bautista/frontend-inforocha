@@ -5,6 +5,7 @@ import { formatCurrency, getOrderStatus } from "@/lib/mock-data";
 import { ordersAPI } from "@/lib/api";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -28,6 +29,7 @@ import {
   Package,
   TrendingUp,
   FileText,
+  FileDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
@@ -142,6 +144,26 @@ export default function MisPedidosPage() {
   const filteredRevenue = stats.totalRevenue;
   const pendingOrders = stats.pending;
 
+  const handleDownloadRemito = async (orderId, orderNumber) => {
+    try {
+      const blob = await ordersAPI.downloadRemito(orderId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Remito-${orderNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success("Remito descargado");
+    } catch (err) {
+      console.error("Error downloading remito:", err);
+      toast.error("Error al descargar remito", {
+        description: err.message,
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -238,9 +260,23 @@ export default function MisPedidosPage() {
                       {orderStatus.label}
                     </Badge>
                   </div>
-                  <p className="text-xl font-bold text-foreground">
-                    {formatCurrency(order.total)}
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDownloadRemito(order.id, order.order_number);
+                      }}
+                    >
+                      <FileDown className="w-4 h-4" />
+                      Remito
+                    </Button>
+                    <p className="text-xl font-bold text-foreground">
+                      {formatCurrency(order.total)}
+                    </p>
+                  </div>
                 </div>
                 <CardDescription className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-1">
                   <span className="flex items-center gap-1.5">
