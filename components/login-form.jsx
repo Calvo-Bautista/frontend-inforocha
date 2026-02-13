@@ -117,30 +117,7 @@ export function LoginForm() {
               </Button>
             </form>
 
-            <div className="mt-6 pt-4 border-t border-border">
-              <p className="text-xs text-muted-foreground text-center mb-2">
-                Usuarios de demostración:
-              </p>
-              <div className="space-y-1 text-xs text-muted-foreground">
-                <p>
-                  <span className="font-medium">Vendedor:</span>{" "}
-                  vendedor@rocha.com
-                </p>
-                <p>
-                  <span className="font-medium">Logística:</span>{" "}
-                  logistica@rocha.com
-                </p>
-                <p>
-                  <span className="font-medium">Admin:</span> admin@rocha.com
-                </p>
-                <p>
-                  <span className="font-medium">Owner:</span> owner@rocha.com
-                </p>
-                <p className="text-center mt-2">
-                  Contraseña: <span className="font-mono">123456</span>
-                </p>
-              </div>
-            </div>
+
           </CardContent>
         </Card>
       </div>

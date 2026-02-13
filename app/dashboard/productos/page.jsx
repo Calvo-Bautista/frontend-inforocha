@@ -322,27 +322,28 @@ export default function ProductosPage() {
               Consulta el inventario y disponibilidad de stock
             </p>
           </div>
-          {user?.role === "owner" && (
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={handleDownloadBudget}
-                disabled={isDownloading || products.length === 0}
-                className="gap-2"
-              >
-                {isDownloading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Download className="w-4 h-4" />
-                )}
-                Descargar Presupuesto
-              </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleDownloadBudget}
+              disabled={isDownloading || products.length === 0}
+              className="gap-2"
+            >
+              {isDownloading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              Descargar Presupuesto
+            </Button>
+
+            {user?.role === "owner" && (
               <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
                 <Plus className="w-4 h-4" />
                 Nuevo Producto
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Error State */}
