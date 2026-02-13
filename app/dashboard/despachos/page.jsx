@@ -157,29 +157,31 @@ export default function DespachosPage() {
     return () => clearTimeout(timer);
   }, [statusFilter, searchTerm, page, limit, monthFilter, yearFilter]);
 
-  // Fetch stats separately (only once on mount or when needed)
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const params = {};
-        if (monthFilter !== "all") {
-          params.month = parseInt(monthFilter);
-        }
-        if (yearFilter !== "all") {
-          params.year = parseInt(yearFilter);
-        }
-
-        const data = await ordersAPI.getStats(params);
-        setStats({
-          pending: data.by_status.pendiente || 0,
-          inPreparation: data.by_status.preparacion || 0,
-          shipped: data.by_status.enviado || 0,
-          delivered: data.by_status.entregado || 0
-        });
-      } catch (err) {
-        console.error("Error fetching stats:", err);
+  // Fetch stats function
+  const fetchStats = async () => {
+    try {
+      const params = {};
+      if (monthFilter !== "all") {
+        params.month = parseInt(monthFilter);
       }
-    };
+      if (yearFilter !== "all") {
+        params.year = parseInt(yearFilter);
+      }
+
+      const data = await ordersAPI.getStats(params);
+      setStats({
+        pending: data.by_status.pendiente || 0,
+        inPreparation: data.by_status.preparacion || 0,
+        shipped: data.by_status.enviado || 0,
+        delivered: data.by_status.entregado || 0
+      });
+    } catch (err) {
+      console.error("Error fetching stats:", err);
+    }
+  };
+
+  // Fetch stats on filter change
+  useEffect(() => {
     fetchStats();
   }, [monthFilter, yearFilter]);
 
@@ -200,6 +202,9 @@ export default function DespachosPage() {
         )
       );
       toast.success("Estado actualizado exitosamente");
+
+      // Refresh stats
+      fetchStats();
     } catch (err) {
       console.error("Error updating order status:", err);
       toast.error("Error al actualizar estado", {
