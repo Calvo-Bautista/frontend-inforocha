@@ -203,9 +203,16 @@ export default function NuevaOrdenPage() {
   const handleUpdateQuantity = (productId, newQuantity) => {
     if (newQuantity < 1) return;
     setCartItems((prev) =>
-      prev.map((item) =>
-        item.productId === productId ? { ...item, quantity: newQuantity } : item
-      )
+      prev.map((item) => {
+        if (item.productId === productId) {
+          if (newQuantity > item.stock) {
+            toast.warning(`Solo hay ${item.stock} unidades disponibles`);
+            return { ...item, quantity: item.stock };
+          }
+          return { ...item, quantity: newQuantity };
+        }
+        return item;
+      })
     );
   };
 
@@ -517,7 +524,17 @@ export default function NuevaOrdenPage() {
                       step={0.01}
                       placeholder="0.00"
                       value={repairAmount}
-                      onChange={(e) => setRepairAmount(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (["-", "+", "e", "E"].includes(e.key)) {
+                          e.preventDefault();
+                        }
+                      }}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "" || parseFloat(val) >= 0) {
+                          setRepairAmount(val);
+                        }
+                      }}
                       required={includesRepair}
                     />
                   </div>
@@ -632,9 +649,16 @@ export default function NuevaOrdenPage() {
                     min={1}
                     max={selectedProduct?.stock || 999}
                     value={quantity}
-                    onChange={(e) =>
-                      setQuantity(Math.max(1, parseInt(e.target.value) || 1))
-                    }
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 1;
+                      const max = selectedProduct?.stock || 999;
+                      if (val > max) {
+                        setQuantity(max);
+                        toast.warning(`Solo hay ${max} unidades disponibles`);
+                      } else {
+                        setQuantity(Math.max(1, val));
+                      }
+                    }}
                   />
                 </div>
                 <Button
