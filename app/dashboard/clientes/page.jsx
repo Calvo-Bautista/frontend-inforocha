@@ -335,7 +335,7 @@ export default function ClientesPage() {
                 Nuevo Contacto
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Registrar Nuevo Contacto</DialogTitle>
                 <DialogDescription>
@@ -515,7 +515,7 @@ export default function ClientesPage() {
 
           {/* Edit Contact Dialog */}
           <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Editar Cliente</DialogTitle>
                 <DialogDescription>

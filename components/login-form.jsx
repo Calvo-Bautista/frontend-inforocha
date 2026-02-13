@@ -14,7 +14,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Loader2, Printer } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import Image from "next/image";
 
 export function LoginForm() {
   const { login, isLoading, error } = useAuth();
@@ -39,8 +40,15 @@ export function LoginForm() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-primary rounded-xl flex items-center justify-center mb-4">
-            <Printer className="w-8 h-8 text-primary-foreground" />
+          <div className="w-16 h-16 bg-black rounded-xl flex items-center justify-center mb-4 overflow-hidden p-2">
+            <Image
+              src="/Logo.png"
+              alt="Logo"
+              width={64}
+              height={64}
+              className="object-contain"
+              priority
+            />
           </div>
           <h1 className="text-2xl font-bold text-foreground">
             Mayorista Rocha
