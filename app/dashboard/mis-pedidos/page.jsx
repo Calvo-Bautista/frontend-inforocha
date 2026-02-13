@@ -22,6 +22,13 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+  } from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -62,11 +69,31 @@ const statusColorMap = {
   success: "bg-success text-success-foreground",
 };
 
+const months = [
+  { value: 1, label: "Enero" },
+  { value: 2, label: "Febrero" },
+  { value: 3, label: "Marzo" },
+  { value: 4, label: "Abril" },
+  { value: 5, label: "Mayo" },
+  { value: 6, label: "Junio" },
+  { value: 7, label: "Julio" },
+  { value: 8, label: "Agosto" },
+  { value: 9, label: "Septiembre" },
+  { value: 10, label: "Octubre" },
+  { value: 11, label: "Noviembre" },
+  { value: 12, label: "Diciembre" },
+];
+
+const currentYear = new Date().getFullYear();
+const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
+
 export default function MisPedidosPage() {
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [monthFilter, setMonthFilter] = useState((new Date().getMonth() + 1).toString());
+  const [yearFilter, setYearFilter] = useState(currentYear.toString());
 
   const searchParams = useSearchParams();
 
@@ -88,7 +115,7 @@ export default function MisPedidosPage() {
   // Reset page to 1 when filters change
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, searchTerm]);
+  }, [statusFilter, searchTerm, monthFilter, yearFilter]);
 
   // Fetch orders from API
   useEffect(() => {
@@ -104,6 +131,12 @@ export default function MisPedidosPage() {
         }
         if (searchTerm) {
           params.search = searchTerm;
+        }
+        if (monthFilter !== "all") {
+          params.month = parseInt(monthFilter);
+        }
+        if (yearFilter !== "all") {
+          params.year = parseInt(yearFilter);
         }
 
         const data = await ordersAPI.getAll(params);
@@ -126,13 +159,21 @@ export default function MisPedidosPage() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [statusFilter, searchTerm, page, limit]);
+  }, [statusFilter, searchTerm, page, limit, monthFilter, yearFilter]);
 
   // Fetch stats separately
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const data = await ordersAPI.getStats();
+        const params = {};
+        if (monthFilter !== "all") {
+          params.month = parseInt(monthFilter);
+        }
+        if (yearFilter !== "all") {
+          params.year = parseInt(yearFilter);
+        }
+
+        const data = await ordersAPI.getStats(params);
         setStats({
           totalOrders: data.total_orders,
           totalRevenue: data.total_revenue,
@@ -143,7 +184,7 @@ export default function MisPedidosPage() {
       }
     };
     fetchStats();
-  }, []);
+  }, [monthFilter, yearFilter]);
 
   // Debug: log first order to see structure
   useEffect(() => {
@@ -253,16 +294,54 @@ export default function MisPedidosPage() {
       </div>
 
       {/* Search and Filters */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por ID o nombre de cliente..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9"
-          />
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por ID o nombre de cliente..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Select
+              value={monthFilter}
+              onValueChange={setMonthFilter}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Mes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los Meses</SelectItem>
+                {months.map((m) => (
+                  <SelectItem key={m.value} value={m.value.toString()}>
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={yearFilter}
+              onValueChange={setYearFilter}
+            >
+              <SelectTrigger className="w-[100px]">
+                <SelectValue placeholder="Año" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                {years.map((y) => (
+                  <SelectItem key={y} value={y.toString()}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
+
         <div className="flex gap-2 flex-wrap">
           {statusFilters.map((filter) => (
             <button
