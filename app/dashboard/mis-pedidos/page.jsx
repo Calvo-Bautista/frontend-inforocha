@@ -22,12 +22,12 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-  } from "@/components/ui/select";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -67,6 +67,7 @@ const statusColorMap = {
   default: "bg-secondary text-secondary-foreground",
   primary: "bg-primary text-primary-foreground",
   success: "bg-success text-success-foreground",
+  destructive: "bg-destructive text-destructive-foreground",
 };
 
 const months = [
@@ -86,6 +87,16 @@ const months = [
 
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
+
+const formatDateUTC = (dateString) => {
+  if (!dateString) return "";
+  const date = new Date(`${dateString}T12:00:00`);
+  return date.toLocaleDateString("es-AR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+};
 
 export default function MisPedidosPage() {
   const [orders, setOrders] = useState([]);
@@ -203,6 +214,7 @@ export default function MisPedidosPage() {
     { value: "preparacion", label: "En Preparación" },
     { value: "enviado", label: "Enviado" },
     { value: "entregado", label: "Entregado" },
+    { value: "cancelado", label: "Cancelado" },
   ];
 
   // Stats
@@ -374,7 +386,7 @@ export default function MisPedidosPage() {
                       {orderStatus.label}
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Button
                       variant="outline"
                       size="sm"
@@ -385,7 +397,7 @@ export default function MisPedidosPage() {
                       }}
                     >
                       <Eye className="w-4 h-4" />
-                      Ver Detalle
+                      <span className="hidden sm:inline">Ver Detalle</span>
                     </Button>
                     <Button
                       variant="outline"
@@ -397,9 +409,9 @@ export default function MisPedidosPage() {
                       }}
                     >
                       <FileDown className="w-4 h-4" />
-                      Remito
+                      <span className="hidden sm:inline">Remito</span>
                     </Button>
-                    <p className="text-xl font-bold text-foreground">
+                    <p className="text-xl font-bold text-foreground ml-auto">
                       {formatCurrency(order.total)}
                     </p>
                   </div>
@@ -411,11 +423,7 @@ export default function MisPedidosPage() {
                   </span>
                   <span className="flex items-center gap-1.5">
                     <Calendar className="w-4 h-4" />
-                    {new Date(order.order_date).toLocaleDateString("es-AR", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    })}
+                    {formatDateUTC(order.order_date)}
                   </span>
                 </CardDescription>
               </CardHeader>
@@ -503,27 +511,27 @@ export default function MisPedidosPage() {
 
       {/* Order Detail Modal */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-3">
-              <span>Detalle del Pedido {selectedOrder?.order_number || selectedOrder?.id}</span>
+            <DialogTitle className="flex flex-wrap items-center gap-2 pr-6">
+              <span className="text-base sm:text-lg">Detalle del Pedido {selectedOrder?.order_number || selectedOrder?.id}</span>
               {selectedOrder && (
                 <Badge className={statusColorMap[getOrderStatus(selectedOrder.status).color]}>
                   {getOrderStatus(selectedOrder.status).label}
                 </Badge>
               )}
-              {selectedOrder && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2 ml-auto mr-8"
-                  onClick={() => handleDownloadRemito(selectedOrder.id, selectedOrder.order_number)}
-                >
-                  <FileDown className="w-4 h-4" />
-                  Descargar Remito
-                </Button>
-              )}
             </DialogTitle>
+            {selectedOrder && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 w-fit mt-2"
+                onClick={() => handleDownloadRemito(selectedOrder.id, selectedOrder.order_number)}
+              >
+                <FileDown className="w-4 h-4" />
+                Descargar Remito
+              </Button>
+            )}
           </DialogHeader>
 
           {selectedOrder && (
@@ -542,6 +550,10 @@ export default function MisPedidosPage() {
                       <Phone className="w-4 h-4 text-muted-foreground" />
                       {selectedOrder.client?.phone || "Sin Teléfono"}
                     </p>
+                    <p className="text-sm flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-muted-foreground" />
+                      {selectedOrder.client?.cuit ? `CUIT: ${selectedOrder.client.cuit}` : "Sin CUIT"}
+                    </p>
                     <p className="text-sm flex items-start gap-2">
                       <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
                       {selectedOrder.client?.address || "Sin Dirección"}
@@ -558,14 +570,7 @@ export default function MisPedidosPage() {
                   <CardContent className="space-y-2">
                     <p className="text-sm flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-muted-foreground" />
-                      {selectedOrder.created_at ? new Date(selectedOrder.created_at).toLocaleDateString("es-AR", {
-                        weekday: "long",
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit"
-                      }) : "Fecha inválida"}
+                      {selectedOrder.order_date ? formatDateUTC(selectedOrder.order_date) : "Fecha inválida"}
                     </p>
                     <p className="text-sm flex items-center gap-2">
                       <User className="w-4 h-4 text-muted-foreground" />
@@ -595,33 +600,35 @@ export default function MisPedidosPage() {
                     Productos ({getTotalItems(selectedOrder.items)} unidades)
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>SKU</TableHead>
-                        <TableHead>Producto</TableHead>
-                        <TableHead className="text-center">Cant.</TableHead>
-                        <TableHead className="text-right">Subtotal</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {selectedOrder.items.map((item, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell className="font-mono text-xs">{item.product?.sku || "N/A"}</TableCell>
-                          <TableCell className="font-medium">{item.product?.name || "Eliminado"}</TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant="secondary" className="font-bold text-base">
-                              {item.quantity}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {formatCurrency(item.price_at_time * item.quantity)}
-                          </TableCell>
+                <CardContent className="p-0 sm:p-6">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="hidden sm:table-cell">SKU</TableHead>
+                          <TableHead>Producto</TableHead>
+                          <TableHead className="text-center">Cant.</TableHead>
+                          <TableHead className="text-right">Subtotal</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedOrder.items.map((item, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="font-mono text-xs hidden sm:table-cell">{item.product?.sku || "N/A"}</TableCell>
+                            <TableCell className="font-medium text-sm">{item.product?.name || "Eliminado"}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="secondary" className="font-bold text-base">
+                                {item.quantity}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right whitespace-nowrap">
+                              {formatCurrency(item.price_at_time * item.quantity)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </CardContent>
               </Card>
 

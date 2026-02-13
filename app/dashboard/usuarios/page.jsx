@@ -198,17 +198,6 @@ export default function UsuariosPage() {
     },
   });
 
-  // Generate next legajo number
-  const generateLegajo = () => {
-    const legajos = users.map(u => {
-      const match = u.legajo?.match(/LEG-(\d+)/);
-      return match ? parseInt(match[1]) : 0;
-    });
-    const maxLegajo = Math.max(...legajos, 0);
-    const nextNumber = maxLegajo + 1;
-    return `LEG-${String(nextNumber).padStart(3, '0')}`;
-  };
-
   // Filter users by search term (Server side handled)
   const filteredUsers = users;
 
@@ -220,7 +209,6 @@ export default function UsuariosPage() {
         name: data.name,
         email: data.email,
         role: data.role,
-        legajo: generateLegajo(),
         password: data.password,
       };
 

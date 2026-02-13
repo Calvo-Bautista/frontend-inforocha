@@ -641,7 +641,7 @@ export default function NuevaOrdenPage() {
               )}
 
               <div className="flex gap-3 items-end">
-                <div className="space-y-2 flex-1">
+                <div className="space-y-2 flex-1 min-w-0">
                   <Label htmlFor="quantity">Cantidad</Label>
                   <Input
                     id="quantity"
@@ -664,10 +664,11 @@ export default function NuevaOrdenPage() {
                 <Button
                   onClick={handleAddToCart}
                   disabled={!selectedProduct || quantity < 1}
-                  className="gap-2"
+                  size="icon"
+                  className="shrink-0 sm:w-auto sm:px-4 sm:gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  Agregar
+                  <span className="hidden sm:inline">Agregar</span>
                 </Button>
               </div>
             </CardContent>
@@ -704,14 +705,19 @@ export default function NuevaOrdenPage() {
                       {cartItems.map((item) => (
                         <div
                           key={item.productId}
-                          className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg"
+                          className="p-3 bg-secondary/30 rounded-lg space-y-2"
                         >
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">
-                              {item.productName}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatCurrency(item.price)} c/u
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-sm truncate">
+                                {item.productName}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatCurrency(item.price)} c/u
+                              </p>
+                            </div>
+                            <p className="text-sm font-medium whitespace-nowrap">
+                              {formatCurrency(item.price * item.quantity)}
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
@@ -731,16 +737,13 @@ export default function NuevaOrdenPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              className="h-8 w-8 shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                               onClick={() => handleRemoveFromCart(item.productId)}
                             >
                               <Trash2 className="w-4 h-4" />
                               <span className="sr-only">Eliminar</span>
                             </Button>
                           </div>
-                          <p className="text-sm font-medium w-24 text-right">
-                            {formatCurrency(item.price * item.quantity)}
-                          </p>
                         </div>
                       ))}
                     </div>
@@ -752,18 +755,19 @@ export default function NuevaOrdenPage() {
 
                     {/* Percentage Discount */}
                     <div className={cn(
-                      "flex items-center justify-between p-3 rounded-lg",
+                      "flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg",
                       availableDiscountPercent > 0 ? "bg-success/10 border border-success/20" : "bg-secondary/30"
                     )}>
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-3 min-w-0">
                         <Checkbox
                           id="discount"
                           checked={applyDiscount}
                           onCheckedChange={setApplyDiscount}
                           disabled={availableDiscountPercent === 0 || cartItems.length === 0}
+                          className="shrink-0"
                         />
-                        <div className="flex items-center gap-2">
-                          <Percent className="w-4 h-4 text-muted-foreground" />
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Percent className="w-4 h-4 text-muted-foreground shrink-0" />
                           <Label htmlFor="discount" className={cn(
                             "cursor-pointer font-normal text-sm",
                             availableDiscountPercent === 0 || cartItems.length === 0 && "text-muted-foreground"
@@ -776,7 +780,7 @@ export default function NuevaOrdenPage() {
                         </div>
                       </div>
                       {applyDiscount && discountAmount > 0 && (
-                        <span className="text-sm font-medium text-success">
+                        <span className="text-sm font-medium text-success whitespace-nowrap">
                           -{formatCurrency(discountAmount)}
                         </span>
                       )}
@@ -792,26 +796,27 @@ export default function NuevaOrdenPage() {
                     )}
 
                     {/* Waive Shipping */}
-                    <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                    <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-secondary/30 rounded-lg">
                       <div className="flex items-center space-x-3">
                         <Checkbox
                           id="shipping"
                           checked={waiveShipping}
                           onCheckedChange={setWaiveShipping}
+                          className="shrink-0"
                         />
                         <div className="flex items-center gap-2">
-                          <Truck className="w-4 h-4 text-muted-foreground" />
+                          <Truck className="w-4 h-4 text-muted-foreground shrink-0" />
                           <Label htmlFor="shipping" className="cursor-pointer font-normal text-sm">
                             Sin cargo de envío
                           </Label>
                         </div>
                       </div>
                       {waiveShipping ? (
-                        <span className="text-sm font-medium text-success">
+                        <span className="text-sm font-medium text-success whitespace-nowrap">
                           -{formatCurrency(Number(systemConfig?.shipping_cost || DEFAULT_SHIPPING_COST))}
                         </span>
                       ) : (
-                        <span className="text-sm text-muted-foreground">
+                        <span className="text-sm text-muted-foreground whitespace-nowrap">
                           +{formatCurrency(Number(systemConfig?.shipping_cost || DEFAULT_SHIPPING_COST))}
                         </span>
                       )}

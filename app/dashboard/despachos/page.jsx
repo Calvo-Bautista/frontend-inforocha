@@ -58,6 +58,7 @@ const statusColorMap = {
   default: "bg-secondary text-secondary-foreground",
   primary: "bg-primary text-primary-foreground",
   success: "bg-success text-success-foreground",
+  destructive: "bg-destructive text-destructive-foreground",
 };
 
 const statusOptions = [
@@ -65,6 +66,7 @@ const statusOptions = [
   { value: "preparacion", label: "En Preparación" },
   { value: "enviado", label: "Enviado" },
   { value: "entregado", label: "Entregado" },
+  { value: "cancelado", label: "Cancelado" },
 ];
 
 const months = [
@@ -264,6 +266,7 @@ export default function DespachosPage() {
     { value: "preparacion", label: "En Preparación" },
     { value: "enviado", label: "Enviado" },
     { value: "entregado", label: "Entregado" },
+    { value: "cancelado", label: "Cancelado" },
   ];
 
   return (

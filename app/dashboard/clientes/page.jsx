@@ -121,6 +121,7 @@ export default function ClientesPage() {
     defaultValues: {
       name: "",
       phone: "",
+      cuit: "",
       address: "",
       industry: "",
       maquinas: "",
@@ -222,6 +223,7 @@ export default function ClientesPage() {
     resetEdit({
       name: client.name,
       phone: client.phone,
+      cuit: client.cuit || "",
       address: client.address || "",
       industry: client.industry || "",
       maquinas: client.maquinas || "",
@@ -368,6 +370,19 @@ export default function ClientesPage() {
                       {errorsNew.phone && (
                         <p className="text-sm text-destructive">
                           {errorsNew.phone.message}
+                        </p>
+                      )}
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="cuit">CUIT/CUIL</Label>
+                      <Input
+                        id="cuit"
+                        {...registerNew("cuit")}
+                        placeholder="20-12345678-9"
+                      />
+                      {errorsNew.cuit && (
+                        <p className="text-sm text-destructive">
+                          {errorsNew.cuit.message}
                         </p>
                       )}
                     </div>
@@ -546,6 +561,19 @@ export default function ClientesPage() {
                       {errorsEdit.phone && (
                         <p className="text-sm text-destructive">
                           {errorsEdit.phone.message}
+                        </p>
+                      )}
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-cuit">CUIT/CUIL</Label>
+                      <Input
+                        id="edit-cuit"
+                        {...registerEdit("cuit")}
+                        placeholder="20-12345678-9"
+                      />
+                      {errorsEdit.cuit && (
+                        <p className="text-sm text-destructive">
+                          {errorsEdit.cuit.message}
                         </p>
                       )}
                     </div>
@@ -734,6 +762,7 @@ export default function ClientesPage() {
                     <TableHead>Legajo</TableHead>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Teléfono</TableHead>
+                    <TableHead>CUIT/CUIL</TableHead>
                     <TableHead>Máquinas</TableHead>
                     <TableHead>Tipo Cliente</TableHead>
                     <TableHead>Proveedor Actual</TableHead>
@@ -766,6 +795,11 @@ export default function ClientesPage() {
                             <Phone className="w-4 h-4 text-muted-foreground" />
                             {client.phone}
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-mono text-sm text-muted-foreground">
+                            {client.cuit || "-"}
+                          </span>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2 max-w-xs">
