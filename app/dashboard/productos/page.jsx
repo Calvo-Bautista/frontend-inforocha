@@ -41,7 +41,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, Package, AlertCircle, Plus, Loader2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Search, Package, AlertCircle, Plus, Loader2, MoreHorizontal, Pencil, Trash2, FileText, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
@@ -68,6 +68,7 @@ export default function ProductosPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false); // New state for download loading
   const [productToEdit, setProductToEdit] = useState(null);
   const [productToDelete, setProductToDelete] = useState(null);
 
@@ -271,6 +272,41 @@ export default function ProductosPage() {
     }
   };
 
+  const handleDownloadBudget = async () => {
+    try {
+      setIsDownloading(true);
+
+      const params = {};
+      if (categoryFilter !== "all") {
+        params.category = categoryFilter;
+      }
+      if (debouncedSearchTerm) {
+        params.search = debouncedSearchTerm;
+      }
+
+      const blob = await productsAPI.downloadBudget(params);
+
+      // Create a URL for the blob
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `presupuesto_${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success("Presupuesto descargado con éxito");
+    } catch (err) {
+      console.error("Error downloading budget:", err);
+      toast.error("Error al descargar presupuesto", {
+        description: err.message,
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   if (isLoading) {
     return <Loading />;
   }
@@ -287,10 +323,25 @@ export default function ProductosPage() {
             </p>
           </div>
           {user?.role === "owner" && (
-            <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
-              <Plus className="w-4 h-4" />
-              Nuevo Producto
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={handleDownloadBudget}
+                disabled={isDownloading || products.length === 0}
+                className="gap-2"
+              >
+                {isDownloading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                Descargar Presupuesto
+              </Button>
+              <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
+                <Plus className="w-4 h-4" />
+                Nuevo Producto
+              </Button>
+            </div>
           )}
         </div>
 
