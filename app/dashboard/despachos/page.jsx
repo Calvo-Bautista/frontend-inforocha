@@ -434,10 +434,10 @@ export default function DespachosPage() {
                           <Badge className={statusColorMap[orderStatus.color]}>
                             {orderStatus.label}
                           </Badge>
-                          {order.factura_a && (
+                          {order.invoice_type && (
                             <Badge variant="outline" className="border-primary text-primary">
                               <FileText className="w-3 h-3 mr-1" />
-                              Factura A
+                              Factura {order.invoice_type}
                             </Badge>
                           )}
                         </div>
@@ -670,14 +670,14 @@ export default function DespachosPage() {
                       Vendedor: {selectedOrder.seller?.name || "Desconocido"}
                     </p>
                     <div className="flex items-center gap-2">
-                      {selectedOrder.factura_a ? (
+                      {selectedOrder.invoice_type ? (
                         <Badge className="bg-primary text-primary-foreground">
                           <FileText className="w-3 h-3 mr-1" />
-                          Requiere Factura A
+                          Factura {selectedOrder.invoice_type}
                         </Badge>
                       ) : (
                         <Badge variant="secondary">
-                          Sin Factura A
+                          Sin Factura
                         </Badge>
                       )}
                     </div>

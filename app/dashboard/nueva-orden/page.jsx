@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   ShoppingCart,
   Plus,
@@ -54,7 +55,7 @@ export default function NuevaOrdenPage() {
   const [showSuccess, setShowSuccess] = useState(false);
 
   // New states for invoice and discounts
-  const [wantsFacturaA, setWantsFacturaA] = useState(false);
+  const [invoiceType, setInvoiceType] = useState("sin_factura");
   const [applyDiscount, setApplyDiscount] = useState(false);
   const [waiveShipping, setWaiveShipping] = useState(false);
 
@@ -287,7 +288,7 @@ export default function NuevaOrdenPage() {
         shipping: waiveShipping ? 0 : shippingCost,
         shipping_discount: waiveShipping,
         total: cartTotal,
-        factura_a: wantsFacturaA,
+        invoice_type: invoiceType === "sin_factura" ? null : invoiceType,
         notes: orderNotes || null,
         repair_description: includesRepair ? repairDescription : null,
         repair_amount: includesRepair ? parseFloat(repairAmount) || 0 : 0,
@@ -334,7 +335,7 @@ export default function NuevaOrdenPage() {
             </h3>
             <p className="text-muted-foreground mb-4">
               Tu pedido ha sido creado exitosamente
-              {wantsFacturaA && " (con Factura A)"}
+              {invoiceType !== "sin_factura" && ` (con Factura ${invoiceType})`}
             </p>
             <p className="text-sm text-muted-foreground">
               Redirigiendo a Mis Pedidos...
@@ -444,19 +445,34 @@ export default function NuevaOrdenPage() {
                 </div>
               )}
 
-              {/* Factura A Checkbox */}
-              <div className="flex items-center space-x-3 p-3 bg-secondary/30 rounded-lg">
-                <Checkbox
-                  id="facturaA"
-                  checked={wantsFacturaA}
-                  onCheckedChange={setWantsFacturaA}
-                />
-                <div className="flex items-center gap-2">
+              {/* Invoice Type Radio Group */}
+              <div className="space-y-3 p-3 bg-secondary/30 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
                   <FileText className="w-4 h-4 text-muted-foreground" />
-                  <Label htmlFor="facturaA" className="cursor-pointer font-normal">
-                    El cliente requiere Factura A
-                  </Label>
+                  <Label className="font-medium">Tipo de Facturación</Label>
                 </div>
+                <RadioGroup
+                  value={invoiceType}
+                  onValueChange={setInvoiceType}
+                  className="grid grid-cols-2 sm:grid-cols-4 gap-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="A" id="ft-a" />
+                    <Label htmlFor="ft-a" className="cursor-pointer">Factura A</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="B" id="ft-b" />
+                    <Label htmlFor="ft-b" className="cursor-pointer">Factura B</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="C" id="ft-c" />
+                    <Label htmlFor="ft-c" className="cursor-pointer">Factura C</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="sin_factura" id="ft-none" />
+                    <Label htmlFor="ft-none" className="cursor-pointer">Sin Factura</Label>
+                  </div>
+                </RadioGroup>
               </div>
 
               <div className="space-y-2">
@@ -867,10 +883,10 @@ export default function NuevaOrdenPage() {
                         Incluye reparación: {formatCurrency(parseFloat(repairAmount) || 0)}
                       </div>
                     )}
-                    {wantsFacturaA && (
+                    {invoiceType !== "sin_factura" && (
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <FileText className="w-3 h-3" />
-                        <span>Se emitirá Factura A</span>
+                        <span>Se emitirá Factura {invoiceType}</span>
                       </div>
                     )}
                   </div>

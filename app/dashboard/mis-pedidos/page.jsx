@@ -462,12 +462,12 @@ export default function MisPedidosPage() {
                 </Accordion>
 
                 {/* Notes, Factura A, and Repair */}
-                {(order.notes || order.factura_a || order.repair_description) && (
+                {(order.notes || order.invoice_type || order.repair_description) && (
                   <div className="mt-3 pt-3 border-t border-border space-y-2">
-                    {order.factura_a && (
+                    {order.invoice_type && (
                       <div className="flex items-center gap-2 text-sm">
                         <FileText className="w-4 h-4 text-primary" />
-                        <span className="font-medium">Requiere Factura A</span>
+                        <span className="font-medium">Requiere Factura {order.invoice_type}</span>
                       </div>
                     )}
                     {order.repair_description && (
@@ -577,14 +577,14 @@ export default function MisPedidosPage() {
                       Vendedor: {selectedOrder.seller?.name || "Desconocido"}
                     </p>
                     <div className="flex items-center gap-2">
-                      {selectedOrder.factura_a ? (
+                      {selectedOrder.invoice_type ? (
                         <Badge className="bg-primary text-primary-foreground">
                           <FileText className="w-3 h-3 mr-1" />
-                          Requiere Factura A
+                          Factura {selectedOrder.invoice_type}
                         </Badge>
                       ) : (
                         <Badge variant="secondary">
-                          Sin Factura A
+                          Sin Factura
                         </Badge>
                       )}
                     </div>

@@ -263,12 +263,14 @@ export default function SettingsModal({ isOpen, onClose }) {
                                                     <tr key={mod.id} className="hover:bg-secondary/10 transition-colors">
                                                         <td className="p-3 font-medium">{mod.label}</td>
                                                         {ROLES.map(role => {
-                                                            const isChecked = rolePermissions?.[role.id]?.includes(mod.id);
+                                                            const isOwner = role.id === 'owner';
+                                                            const isChecked = isOwner || rolePermissions?.[role.id]?.includes(mod.id);
                                                             return (
                                                                 <td key={`${role.id}-${mod.id}`} className="p-3 text-center">
                                                                     <Checkbox
                                                                         checked={isChecked}
-                                                                        onCheckedChange={() => togglePermission(role.id, mod.id)}
+                                                                        disabled={isOwner}
+                                                                        onCheckedChange={() => !isOwner && togglePermission(role.id, mod.id)}
                                                                     />
                                                                 </td>
                                                             );
