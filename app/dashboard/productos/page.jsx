@@ -75,8 +75,7 @@ export default function ProductosPage() {
 
   // New product form state
   const [newProduct, setNewProduct] = useState({
-    sku: "",
-    name: "",
+    articulo: "",
     description: "",
     price: "",
     stock: "",
@@ -85,8 +84,7 @@ export default function ProductosPage() {
 
   // Edit product form state
   const [editProduct, setEditProduct] = useState({
-    sku: "",
-    name: "",
+    articulo: "",
     description: "",
     price: "",
     stock: "",
@@ -145,7 +143,6 @@ export default function ProductosPage() {
     };
 
     fetchProducts();
-    fetchProducts();
   }, [categoryFilter, debouncedSearchTerm, page, limit]);
 
   // WebSocket updates
@@ -177,8 +174,7 @@ export default function ProductosPage() {
 
     try {
       const productData = {
-        sku: newProduct.sku,
-        name: newProduct.name,
+        articulo: newProduct.articulo,
         description: newProduct.description,
         price: parseFloat(newProduct.price),
         stock: parseInt(newProduct.stock),
@@ -189,13 +185,12 @@ export default function ProductosPage() {
       setProducts((prev) => [...prev, createdProduct]);
 
       toast.success("Producto creado", {
-        description: `${createdProduct.name} ha sido agregado al inventario`,
+        description: `${createdProduct.articulo} ha sido agregado al inventario`,
       });
 
       setIsCreateOpen(false);
       setNewProduct({
-        sku: "",
-        name: "",
+        articulo: "",
         description: "",
         price: "",
         stock: "",
@@ -214,8 +209,7 @@ export default function ProductosPage() {
   const openEditDialog = (product) => {
     setProductToEdit(product);
     setEditProduct({
-      sku: product.sku,
-      name: product.name,
+      articulo: product.articulo,
       description: product.description || "",
       price: product.price.toString(),
       stock: product.stock.toString(),
@@ -232,8 +226,7 @@ export default function ProductosPage() {
 
     try {
       const productData = {
-        sku: editProduct.sku,
-        name: editProduct.name,
+        articulo: editProduct.articulo,
         description: editProduct.description,
         price: parseFloat(editProduct.price),
         stock: parseInt(editProduct.stock),
@@ -247,7 +240,7 @@ export default function ProductosPage() {
       );
 
       toast.success("Producto actualizado", {
-        description: `${updatedProduct.name} ha sido actualizado`,
+        description: `${updatedProduct.articulo} ha sido actualizado`,
       });
 
       setIsEditOpen(false);
@@ -381,7 +374,7 @@ export default function ProductosPage() {
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por nombre, descripción o SKU..."
+              placeholder="Buscar por artículo o descripción..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9"
@@ -450,17 +443,16 @@ export default function ProductosPage() {
                     </DropdownMenu>
                   )}
                 </div>
-                <CardTitle className="text-base mt-3 leading-tight">
-                  {product.name}
-                </CardTitle>
-                <p className="text-xs text-muted-foreground font-mono">
-                  {product.sku}
-                </p>
+                <div className="mt-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                    Artículo: {product.articulo}
+                  </p>
+                  <CardTitle className="text-base leading-tight">
+                    {product.description}
+                  </CardTitle>
+                </div>
               </CardHeader>
               <CardContent className="pt-0">
-                <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
-                  {product.description}
-                </p>
                 <div className="flex items-end justify-between">
                   <div>
                     <p className="text-xs text-muted-foreground">Precio</p>
@@ -523,31 +515,19 @@ export default function ProductosPage() {
             <form onSubmit={handleCreateProduct}>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="sku">SKU *</Label>
+                  <Label htmlFor="articulo">Artículo *</Label>
                   <Input
-                    id="sku"
+                    id="articulo"
                     placeholder="Ej: TN-450"
-                    value={newProduct.sku}
+                    value={newProduct.articulo}
                     onChange={(e) =>
-                      setNewProduct({ ...newProduct, sku: e.target.value })
+                      setNewProduct({ ...newProduct, articulo: e.target.value })
                     }
                     required
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="name">Nombre *</Label>
-                  <Input
-                    id="name"
-                    placeholder="Ej: Toner Brother TN-450"
-                    value={newProduct.name}
-                    onChange={(e) =>
-                      setNewProduct({ ...newProduct, name: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="description">Descripción</Label>
+                  <Label htmlFor="description">Descripción *</Label>
                   <Textarea
                     id="description"
                     placeholder="Descripción del producto..."
@@ -556,6 +536,7 @@ export default function ProductosPage() {
                       setNewProduct({ ...newProduct, description: e.target.value })
                     }
                     rows={3}
+                    required
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -564,9 +545,9 @@ export default function ProductosPage() {
                     <Input
                       id="price"
                       type="number"
-                      step="0.01"
+                      step="0.0001"
                       min="0"
-                      placeholder="0.00"
+                      placeholder="0.0000"
                       value={newProduct.price}
                       onChange={(e) =>
                         setNewProduct({ ...newProduct, price: e.target.value })
@@ -646,29 +627,18 @@ export default function ProductosPage() {
             <form onSubmit={handleEditProduct}>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="edit-sku">SKU *</Label>
+                  <Label htmlFor="edit-articulo">Artículo *</Label>
                   <Input
-                    id="edit-sku"
-                    value={editProduct.sku}
+                    id="edit-articulo"
+                    value={editProduct.articulo}
                     onChange={(e) =>
-                      setEditProduct({ ...editProduct, sku: e.target.value })
+                      setEditProduct({ ...editProduct, articulo: e.target.value })
                     }
                     required
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="edit-name">Nombre *</Label>
-                  <Input
-                    id="edit-name"
-                    value={editProduct.name}
-                    onChange={(e) =>
-                      setEditProduct({ ...editProduct, name: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-description">Descripción</Label>
+                  <Label htmlFor="edit-description">Descripción *</Label>
                   <Textarea
                     id="edit-description"
                     value={editProduct.description}
@@ -676,6 +646,7 @@ export default function ProductosPage() {
                       setEditProduct({ ...editProduct, description: e.target.value })
                     }
                     rows={3}
+                    required
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -684,7 +655,7 @@ export default function ProductosPage() {
                     <Input
                       id="edit-price"
                       type="number"
-                      step="0.01"
+                      step="0.0001"
                       min="0"
                       value={editProduct.price}
                       onChange={(e) =>
@@ -758,7 +729,7 @@ export default function ProductosPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>¿Eliminar producto?</AlertDialogTitle>
               <AlertDialogDescription>
-                El producto <strong>{productToDelete?.name}</strong> será marcado como inactivo.
+                El producto <strong>{productToDelete?.articulo} - {productToDelete?.description}</strong> será marcado como inactivo.
                 No aparecerá en el inventario pero se mantendrá en el historial de órdenes.
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -782,6 +753,6 @@ export default function ProductosPage() {
           </AlertDialogContent>
         </AlertDialog>
       </div>
-    </Suspense>
+    </Suspense >
   );
 }

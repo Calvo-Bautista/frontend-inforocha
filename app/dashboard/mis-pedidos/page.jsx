@@ -445,7 +445,7 @@ export default function MisPedidosPage() {
                           >
                             <div>
                               <p className="font-medium text-sm">
-                                {item.product?.name || `Producto #${item.product_id}`}
+                                {item.product?.description || `Producto #${item.product_id}`}
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 {formatCurrency(item.price_at_time)} x {item.quantity}
@@ -605,8 +605,8 @@ export default function MisPedidosPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="hidden sm:table-cell">SKU</TableHead>
-                          <TableHead>Producto</TableHead>
+                          <TableHead className="hidden sm:table-cell">Articulo</TableHead>
+                          <TableHead>Descripción</TableHead>
                           <TableHead className="text-center">Cant.</TableHead>
                           <TableHead className="text-right">Subtotal</TableHead>
                         </TableRow>
@@ -614,8 +614,8 @@ export default function MisPedidosPage() {
                       <TableBody>
                         {selectedOrder.items.map((item, idx) => (
                           <TableRow key={idx}>
-                            <TableCell className="font-mono text-xs hidden sm:table-cell">{item.product?.sku || "N/A"}</TableCell>
-                            <TableCell className="font-medium text-sm">{item.product?.name || "Eliminado"}</TableCell>
+                            <TableCell className="font-mono text-xs hidden sm:table-cell">{item.product?.articulo || "N/A"}</TableCell>
+                            <TableCell className="font-medium text-sm">{item.product?.description || "Eliminado"}</TableCell>
                             <TableCell className="text-center">
                               <Badge variant="secondary" className="font-bold text-base">
                                 {item.quantity}

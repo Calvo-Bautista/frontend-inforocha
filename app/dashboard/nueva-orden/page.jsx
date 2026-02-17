@@ -153,7 +153,10 @@ export default function NuevaOrdenPage() {
     }
     const searchLower = productSearchTerm.toLowerCase();
     return availableProducts
-      .filter((p) => p.name.toLowerCase().includes(searchLower))
+      .filter((p) =>
+        (p.description && p.description.toLowerCase().includes(searchLower)) ||
+        (p.articulo && p.articulo.toLowerCase().includes(searchLower))
+      )
       .slice(0, 50); // Limit to 50 results
   }, [productSearchTerm]);
 
@@ -201,7 +204,8 @@ export default function NuevaOrdenPage() {
         ...prev,
         {
           productId: selectedProduct.id,
-          productName: selectedProduct.name,
+          productArticulo: selectedProduct.articulo,
+          productDescription: selectedProduct.description,
           price: selectedProduct.price,
           quantity,
           stock: selectedProduct.stock,
@@ -602,7 +606,7 @@ export default function NuevaOrdenPage() {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
                     <Input
                       id="product"
-                      placeholder={selectedProduct ? selectedProduct.name : "Buscar producto por nombre..."}
+                      placeholder={selectedProduct ? selectedProduct.description : "Buscar producto por artículo o descripción..."}
                       value={productSearchTerm}
                       onChange={(e) => setProductSearchTerm(e.target.value)}
                       onFocus={() => setIsProductDropdownOpen(true)}
@@ -641,9 +645,9 @@ export default function NuevaOrdenPage() {
                               className="w-full px-3 py-2 text-left hover:bg-accent transition-colors border-b border-border last:border-0"
                             >
                               <div className="flex items-center justify-between">
-                                <p className="font-medium text-sm">{product.name}</p>
+                                <p className="font-medium text-sm max-w-[200px] truncate">{product.description}</p>
                                 <span className="text-xs text-muted-foreground">
-                                  Stock: {product.stock}
+                                  {product.articulo} • Stock: {product.stock}
                                 </span>
                               </div>
                               <p className="text-xs text-muted-foreground">
@@ -664,9 +668,9 @@ export default function NuevaOrdenPage() {
 
               {selectedProduct && (
                 <div className="p-3 bg-secondary/50 rounded-lg text-sm">
-                  <p className="font-medium">{selectedProduct.name}</p>
+                  <p className="font-medium">{selectedProduct.description}</p>
                   <p className="text-muted-foreground">
-                    {formatCurrency(selectedProduct.price)} - Stock:{" "}
+                    {selectedProduct.articulo} - {formatCurrency(selectedProduct.price)} - Stock:{" "}
                     {selectedProduct.stock} unidades
                   </p>
                 </div>
@@ -743,10 +747,10 @@ export default function NuevaOrdenPage() {
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0 flex-1">
                               <p className="font-medium text-sm truncate">
-                                {item.productName}
+                                {item.productDescription}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                {formatCurrency(item.price)} c/u
+                                {item.productArticulo} - {formatCurrency(item.price)} c/u
                               </p>
                             </div>
                             <p className="text-sm font-medium whitespace-nowrap">

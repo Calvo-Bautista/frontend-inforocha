@@ -527,8 +527,8 @@ export default function DespachosPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>SKU</TableHead>
-                          <TableHead>Producto</TableHead>
+                          <TableHead>Articulo</TableHead>
+                          <TableHead>Descripción</TableHead>
                           <TableHead className="text-center">Cantidad</TableHead>
                           <TableHead className="text-right">Precio Unit.</TableHead>
                           <TableHead className="text-right">Subtotal</TableHead>
@@ -537,8 +537,8 @@ export default function DespachosPage() {
                       <TableBody>
                         {order.items.map((item, idx) => (
                           <TableRow key={idx}>
-                            <TableCell className="font-mono text-xs">{item.product?.sku || "N/A"}</TableCell>
-                            <TableCell className="font-medium">{item.product?.name || "Producto Eliminado"}</TableCell>
+                            <TableCell className="font-mono text-xs">{item.product?.articulo || "N/A"}</TableCell>
+                            <TableCell className="font-medium">{item.product?.description || "Eliminado"}</TableCell>
                             <TableCell className="text-center">
                               <Badge variant="secondary" className="font-bold">
                                 x{item.quantity}
@@ -697,8 +697,8 @@ export default function DespachosPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>SKU</TableHead>
-                        <TableHead>Producto</TableHead>
+                        <TableHead>Articulo</TableHead>
+                        <TableHead>Descripción</TableHead>
                         <TableHead className="text-center">Cant.</TableHead>
                         <TableHead className="text-right">Subtotal</TableHead>
                       </TableRow>
@@ -706,8 +706,8 @@ export default function DespachosPage() {
                     <TableBody>
                       {selectedOrder.items.map((item, idx) => (
                         <TableRow key={idx}>
-                          <TableCell className="font-mono text-xs">{item.product?.sku || "N/A"}</TableCell>
-                          <TableCell className="font-medium">{item.product?.name || "Eliminado"}</TableCell>
+                          <TableCell className="font-mono text-xs">{item.product?.articulo || "N/A"}</TableCell>
+                          <TableCell className="font-medium">{item.product?.description || "Eliminado"}</TableCell>
                           <TableCell className="text-center">
                             <Badge variant="secondary" className="font-bold text-base">
                               {item.quantity}
