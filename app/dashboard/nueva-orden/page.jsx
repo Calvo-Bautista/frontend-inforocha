@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { clientsAPI, productsAPI, ordersAPI, configAPI } from "@/lib/api";
+import { useWebSocket } from "@/contexts/websocket-context";
 import { formatCurrency } from "@/lib/mock-data";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -110,6 +111,21 @@ export default function NuevaOrdenPage() {
 
     fetchData();
   }, []);
+
+  // WebSocket updates
+  const { lastMessage } = useWebSocket();
+
+  useEffect(() => {
+    if (lastMessage && lastMessage.type === "stock_update") {
+      const { product_id, new_stock } = lastMessage;
+
+      setProducts(prevProducts =>
+        prevProducts.map(p =>
+          p.id === product_id ? { ...p, stock: new_stock } : p
+        )
+      );
+    }
+  }, [lastMessage]);
 
   const selectedClient = clients.find((c) => c.id.toString() === selectedClientId);
   const selectedProduct = products.find((p) => p.id.toString() === selectedProductId);
@@ -663,23 +679,24 @@ export default function NuevaOrdenPage() {
                     id="quantity"
                     type="number"
                     min={1}
-                    max={selectedProduct?.stock || 999}
                     value={quantity}
                     onChange={(e) => {
-                      const val = parseInt(e.target.value) || 1;
-                      const max = selectedProduct?.stock || 999;
-                      if (val > max) {
-                        setQuantity(max);
-                        toast.warning(`Solo hay ${max} unidades disponibles`);
-                      } else {
-                        setQuantity(Math.max(1, val));
-                      }
+                      const val = parseInt(e.target.value) || 0;
+                      setQuantity(val);
                     }}
+                    className={cn(
+                      selectedProduct && quantity > selectedProduct.stock && "border-destructive text-destructive focus-visible:ring-destructive"
+                    )}
                   />
+                  {selectedProduct && quantity > selectedProduct.stock && (
+                    <p className="text-xs text-destructive font-medium">
+                      Excede stock disponible ({selectedProduct.stock})
+                    </p>
+                  )}
                 </div>
                 <Button
                   onClick={handleAddToCart}
-                  disabled={!selectedProduct || quantity < 1}
+                  disabled={!selectedProduct || quantity < 1 || (selectedProduct && quantity > selectedProduct.stock)}
                   size="icon"
                   className="shrink-0 sm:w-auto sm:px-4 sm:gap-2"
                 >

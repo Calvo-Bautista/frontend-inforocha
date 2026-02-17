@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/contexts/auth-context";
 import { Sidebar } from "@/components/sidebar";
+import { WebSocketProvider } from "@/contexts/websocket-context";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -21,10 +22,12 @@ export default function DashboardLayout({ children }) {
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar />
-      <main className="lg:pl-64 pt-14 lg:pt-0">
-        <div className="p-4 lg:p-6">{children}</div>
-      </main>
+      <WebSocketProvider>
+        <Sidebar />
+        <main className="lg:pl-64 pt-14 lg:pt-0">
+          <div className="p-4 lg:p-6">{children}</div>
+        </main>
+      </WebSocketProvider>
     </div>
   );
 }

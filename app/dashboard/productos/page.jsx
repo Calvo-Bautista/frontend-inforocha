@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { formatCurrency, getStockStatus } from "@/lib/mock-data";
 import { productsAPI } from "@/lib/api";
+import { useWebSocket } from "@/contexts/websocket-context";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -144,7 +145,23 @@ export default function ProductosPage() {
     };
 
     fetchProducts();
+    fetchProducts();
   }, [categoryFilter, debouncedSearchTerm, page, limit]);
+
+  // WebSocket updates
+  const { lastMessage } = useWebSocket();
+
+  useEffect(() => {
+    if (lastMessage && lastMessage.type === "stock_update") {
+      const { product_id, new_stock } = lastMessage;
+
+      setProducts(prevProducts =>
+        prevProducts.map(p =>
+          p.id === product_id ? { ...p, stock: new_stock } : p
+        )
+      );
+    }
+  }, [lastMessage]);
 
   const categories = [
     { value: "all", label: "Todos" },
