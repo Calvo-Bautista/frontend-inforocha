@@ -425,6 +425,12 @@ export default function MisPedidosPage() {
                     <Calendar className="w-4 h-4" />
                     {formatDateUTC(order.order_date)}
                   </span>
+                  {order.seller && (
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                      <User className="w-4 h-4" />
+                      {order.seller.name}
+                    </span>
+                  )}
                 </CardDescription>
               </CardHeader>
               <CardContent>
