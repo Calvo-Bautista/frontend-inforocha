@@ -14,7 +14,14 @@ export function WebSocketProvider({ children }) {
     const connect = () => {
         try {
             // Replace http/https with ws/wss
-            const wsUrl = API_URL.replace(/^http/, "ws") + "/ws";
+            let wsUrl = API_URL.replace(/^http/, "ws");
+            // Ensure no double slash between base and endpoint, but preserve protocol slash
+            if (wsUrl.endsWith("/")) {
+                wsUrl = wsUrl.slice(0, -1);
+            }
+            wsUrl += "/ws";
+
+            console.log("Connecting to WebSocket:", wsUrl);
 
             const ws = new WebSocket(wsUrl);
             wsRef.current = ws;
@@ -37,8 +44,8 @@ export function WebSocketProvider({ children }) {
                 }
             };
 
-            ws.onclose = () => {
-                console.log("WebSocket Disconnected");
+            ws.onclose = (event) => {
+                console.log("WebSocket Disconnected", event.code, event.reason);
                 setIsConnected(false);
                 reconnectTimeoutRef.current = setTimeout(() => {
                     connect();

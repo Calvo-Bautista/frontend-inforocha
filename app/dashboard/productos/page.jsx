@@ -42,11 +42,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, Package, AlertCircle, Plus, Loader2, MoreHorizontal, Pencil, Trash2, FileText, Download } from "lucide-react";
+import { Search, Package, AlertCircle, Plus, Loader2, MoreHorizontal, Pencil, Trash2, FileText, Download, FileSpreadsheet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import Loading from "./loading";
+import { ImportProductsModal } from "./components/import-modal";
 import { PaginationControls } from "@/components/ui/pagination-controls"; // Import
 import { toast } from "sonner";
 
@@ -57,6 +58,7 @@ export default function ProductosPage() {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // Trigger to refresh list
   const searchParams = useSearchParams();
 
   // Pagination State
@@ -68,6 +70,7 @@ export default function ProductosPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false); // Import modal state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false); // New state for download loading
   const [productToEdit, setProductToEdit] = useState(null);
@@ -143,7 +146,7 @@ export default function ProductosPage() {
     };
 
     fetchProducts();
-  }, [categoryFilter, debouncedSearchTerm, page, limit]);
+  }, [categoryFilter, debouncedSearchTerm, page, limit, refreshTrigger]);
 
   // WebSocket updates
   const { lastMessage } = useWebSocket();
@@ -348,10 +351,20 @@ export default function ProductosPage() {
             </Button>
 
             {user?.role === "owner" && (
-              <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
-                <Plus className="w-4 h-4" />
-                Nuevo Producto
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsImportOpen(true)}
+                  className="gap-2 hidden sm:flex border-dashed"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  Importar Excel
+                </Button>
+                <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
+                  <Plus className="w-4 h-4" />
+                  Nuevo Producto
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -722,6 +735,16 @@ export default function ProductosPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        <ImportProductsModal
+          isOpen={isImportOpen}
+          onClose={() => setIsImportOpen(false)}
+          onSuccess={() => {
+            setIsImportOpen(false);
+            setRefreshTrigger(prev => prev + 1);
+            setPage(1);
+          }}
+        />
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
