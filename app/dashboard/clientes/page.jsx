@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { createClientSchema, editClientSchema } from "@/lib/schemas/clients";
 import { getClientStatus, getClientPriority } from "@/lib/mock-data";
 import { clientsAPI } from "@/lib/api";
+import { useClients } from "@/lib/api-hooks";
 import { useAuth } from "@/contexts/auth-context";
 import { toast } from "sonner";
 
@@ -88,16 +89,13 @@ const statusColorMap = {
 
 export default function ClientesPage() {
   const { user } = useAuth();
-  const [clients, setClients] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
   // Pagination State
   const [page, setPage] = useState(1);
   const [limit] = useState(8);
-  const [totalItems, setTotalItems] = useState(0);
   const [selectedClient, setSelectedClient] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNewContactOpen, setIsNewContactOpen] = useState(false);
@@ -145,51 +143,29 @@ export default function ClientesPage() {
   const [newPrinters, setNewPrinters] = useState([""]);
   const [editPrinters, setEditPrinters] = useState([""]);
 
+  // Debounce search term (500ms)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   // Reset page to 1 when filters change
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, searchTerm]);
+  }, [statusFilter, debouncedSearchTerm]);
 
-  // Fetch clients from API
-  useEffect(() => {
-    const fetchClients = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
+  // Build SWR params
+  const queryParams = useMemo(() => {
+    const params = { skip: (page - 1) * limit, limit };
+    if (statusFilter !== "all") params.status = statusFilter;
+    if (debouncedSearchTerm) params.search = debouncedSearchTerm;
+    return params;
+  }, [page, limit, statusFilter, debouncedSearchTerm]);
 
-        const params = {
-          skip: (page - 1) * limit,
-          limit: limit,
-        };
-        if (statusFilter !== "all") {
-          params.status = statusFilter;
-        }
-        if (searchTerm) {
-          params.search = searchTerm;
-        }
-
-        const data = await clientsAPI.getAll(params);
-        setClients(data);
-        if (data.total !== undefined) {
-          setTotalItems(data.total);
-        }
-      } catch (err) {
-        console.error("Error fetching clients:", err);
-        setError(err.message);
-        toast.error("Error al cargar clientes", {
-          description: err.message,
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchClients();
-  }, [statusFilter, searchTerm, page, limit]);
+  // Data Fetching with SWR
+  const { clients, total: totalItems, isLoading, isError: error, mutate } = useClients(queryParams);
 
   const filteredClients = clients;
-
-
 
   const handleNewContactSubmit = async (data) => {
     try {
@@ -197,24 +173,20 @@ export default function ClientesPage() {
         ...data,
         priority: data.tipoCliente || null,
         proveedor_actual: data.proveedorActual,
-        printers: newPrinters.filter(p => p.trim() !== ""),  // Only send non-empty printers
+        printers: newPrinters.filter(p => p.trim() !== ""),
       };
-      // Remove old fields
       delete clientData.tipoCliente;
       delete clientData.proveedorActual;
       delete clientData.maquinas;
 
-      const createdClient = await clientsAPI.create(clientData);
-      setClients((prev) => [...prev, createdClient]);
+      await clientsAPI.create(clientData);
+      mutate(); // Revalidate SWR cache
       resetNew();
       setNewPrinters([""]);
       setIsNewContactOpen(false);
       toast.success("Cliente creado exitosamente");
     } catch (err) {
-      console.error("Error creating client:", err);
-      toast.error("Error al crear cliente", {
-        description: err.message,
-      });
+      toast.error("Error al crear cliente", { description: err.message });
     }
   };
 
@@ -232,11 +204,9 @@ export default function ClientesPage() {
       status: client.status || "prospect",
     });
 
-    // Populate printers from client.printers array or fallback to maquinas
     if (client.printers && client.printers.length > 0) {
       setEditPrinters(client.printers.map(p => p.printer_model));
     } else if (client.maquinas) {
-      // Fallback: split maquinas string by comma
       setEditPrinters(client.maquinas.split(',').map(p => p.trim()).filter(p => p));
     } else {
       setEditPrinters([""]);
@@ -247,33 +217,24 @@ export default function ClientesPage() {
 
   const handleEditContactSubmit = async (data) => {
     if (!clientToEdit) return;
-
     try {
       const clientData = {
         ...data,
         priority: data.tipoCliente || null,
         proveedor_actual: data.proveedorActual,
-        printers: editPrinters.filter(p => p.trim() !== ""),  // Only send non-empty printers
+        printers: editPrinters.filter(p => p.trim() !== ""),
       };
-      // Remove old fields
       delete clientData.tipoCliente;
       delete clientData.proveedorActual;
       delete clientData.maquinas;
 
-      const updatedClient = await clientsAPI.update(clientToEdit.id, clientData);
-
-      setClients((prev) =>
-        prev.map((c) => (c.id === clientToEdit.id ? updatedClient : c))
-      );
-
+      await clientsAPI.update(clientToEdit.id, clientData);
+      mutate(); // Revalidate SWR cache
       setIsEditOpen(false);
       setClientToEdit(null);
       toast.success("Cliente actualizado exitosamente");
     } catch (err) {
-      console.error("Error updating client:", err);
-      toast.error("Error al actualizar cliente", {
-        description: err.message,
-      });
+      toast.error("Error al actualizar cliente", { description: err.message });
     }
   };
 
@@ -289,27 +250,18 @@ export default function ClientesPage() {
 
   const handleDeleteClient = async () => {
     if (!clientToDelete) return;
-
     try {
       await clientsAPI.delete(clientToDelete.id);
-
-      setClients((prev) => prev.filter((c) => c.id !== clientToDelete.id));
-
+      mutate(); // Revalidate SWR cache
       toast.success("Cliente eliminado", {
         description: `${clientToDelete.name} ha sido eliminado del sistema`,
       });
-
       setIsDeleteOpen(false);
       setClientToDelete(null);
     } catch (err) {
-      console.error("Error deleting client:", err);
-      toast.error("Error al eliminar cliente", {
-        description: err.message,
-      });
+      toast.error("Error al eliminar cliente", { description: err.message });
     }
   };
-
-
 
   const statusFilters = [
     { value: "all", label: "Todos" },
@@ -324,7 +276,7 @@ export default function ClientesPage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">
-              Compradores & Llamadas
+              Compradores &amp; Llamadas
             </h1>
             <p className="text-muted-foreground">
               Gestiona tus clientes y registra las interacciones comerciales
@@ -393,11 +345,6 @@ export default function ClientesPage() {
                         {...registerNew("industry")}
                         placeholder="Ej: Tecnología"
                       />
-                      {errorsNew.industry && (
-                        <p className="text-sm text-destructive">
-                          {errorsNew.industry.message}
-                        </p>
-                      )}
                     </div>
                   </div>
                   <div className="grid gap-2">
@@ -407,11 +354,6 @@ export default function ClientesPage() {
                       {...registerNew("address")}
                       placeholder="Av. Corrientes 1234, CABA"
                     />
-                    {errorsNew.address && (
-                      <p className="text-sm text-destructive">
-                        {errorsNew.address.message}
-                      </p>
-                    )}
                   </div>
                   <div className="grid gap-2">
                     <Label>Impresoras (Marca/Modelo)</Label>
@@ -420,9 +362,12 @@ export default function ClientesPage() {
                         <Input
                           value={printer}
                           onChange={(e) => {
-                            const updated = [...newPrinters];
-                            updated[index] = e.target.value;
-                            setNewPrinters(updated);
+                            const value = e.target.value;
+                            setNewPrinters(prev => {
+                              const updated = [...prev];
+                              updated[index] = value;
+                              return updated;
+                            });
                           }}
                           placeholder="Ej: HP LaserJet Pro M15w"
                         />
@@ -432,7 +377,7 @@ export default function ClientesPage() {
                             variant="outline"
                             size="icon"
                             onClick={() => {
-                              setNewPrinters(newPrinters.filter((_, i) => i !== index));
+                              setNewPrinters(prev => prev.filter((_, i) => i !== index));
                             }}
                           >
                             <Trash2 className="w-4 h-4" />
@@ -444,7 +389,7 @@ export default function ClientesPage() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => setNewPrinters([...newPrinters, ""])}
+                      onClick={() => setNewPrinters(prev => [...prev, ""])}
                       className="w-full"
                     >
                       <Plus className="w-4 h-4 mr-2" />
@@ -472,11 +417,6 @@ export default function ClientesPage() {
                           <SelectItem value="BAJA">Baja Prioridad (1 cada 6+ meses)</SelectItem>
                         </SelectContent>
                       </Select>
-                      {errorsNew.tipoCliente && (
-                        <p className="text-sm text-destructive">
-                          {errorsNew.tipoCliente.message}
-                        </p>
-                      )}
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="proveedorActual">Proveedor Actual</Label>
@@ -485,11 +425,6 @@ export default function ClientesPage() {
                         {...registerNew("proveedorActual")}
                         placeholder="Ej: Suministros BA"
                       />
-                      {errorsNew.proveedorActual && (
-                        <p className="text-sm text-destructive">
-                          {errorsNew.proveedorActual.message}
-                        </p>
-                      )}
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="status">Estado *</Label>
@@ -508,11 +443,6 @@ export default function ClientesPage() {
                           <SelectItem value="active">Cliente Activo</SelectItem>
                         </SelectContent>
                       </Select>
-                      {errorsNew.status && (
-                        <p className="text-sm text-destructive">
-                          {errorsNew.status.message}
-                        </p>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -541,66 +471,31 @@ export default function ClientesPage() {
                 <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
                     <Label htmlFor="edit-name">Nombre de la Empresa *</Label>
-                    <Input
-                      id="edit-name"
-                      {...registerEdit("name")}
-                    />
+                    <Input id="edit-name" {...registerEdit("name")} />
                     {errorsEdit.name && (
-                      <p className="text-sm text-destructive">
-                        {errorsEdit.name.message}
-                      </p>
+                      <p className="text-sm text-destructive">{errorsEdit.name.message}</p>
                     )}
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
                       <Label htmlFor="edit-phone">Teléfono *</Label>
-                      <Input
-                        id="edit-phone"
-                        {...registerEdit("phone")}
-                      />
+                      <Input id="edit-phone" {...registerEdit("phone")} />
                       {errorsEdit.phone && (
-                        <p className="text-sm text-destructive">
-                          {errorsEdit.phone.message}
-                        </p>
+                        <p className="text-sm text-destructive">{errorsEdit.phone.message}</p>
                       )}
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="edit-cuit">CUIT/CUIL</Label>
-                      <Input
-                        id="edit-cuit"
-                        {...registerEdit("cuit")}
-                        placeholder="20-12345678-9"
-                      />
-                      {errorsEdit.cuit && (
-                        <p className="text-sm text-destructive">
-                          {errorsEdit.cuit.message}
-                        </p>
-                      )}
+                      <Input id="edit-cuit" {...registerEdit("cuit")} placeholder="20-12345678-9" />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="edit-industry">Rubro</Label>
-                      <Input
-                        id="edit-industry"
-                        {...registerEdit("industry")}
-                      />
-                      {errorsEdit.industry && (
-                        <p className="text-sm text-destructive">
-                          {errorsEdit.industry.message}
-                        </p>
-                      )}
+                      <Input id="edit-industry" {...registerEdit("industry")} />
                     </div>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="edit-address">Dirección</Label>
-                    <Input
-                      id="edit-address"
-                      {...registerEdit("address")}
-                    />
-                    {errorsEdit.address && (
-                      <p className="text-sm text-destructive">
-                        {errorsEdit.address.message}
-                      </p>
-                    )}
+                    <Input id="edit-address" {...registerEdit("address")} />
                   </div>
                   <div className="grid gap-2">
                     <Label>Impresoras (Marca/Modelo)</Label>
@@ -609,9 +504,12 @@ export default function ClientesPage() {
                         <Input
                           value={printer}
                           onChange={(e) => {
-                            const updated = [...editPrinters];
-                            updated[index] = e.target.value;
-                            setEditPrinters(updated);
+                            const value = e.target.value;
+                            setEditPrinters(prev => {
+                              const updated = [...prev];
+                              updated[index] = value;
+                              return updated;
+                            });
                           }}
                           placeholder="Ej: HP LaserJet Pro M15w"
                         />
@@ -621,7 +519,7 @@ export default function ClientesPage() {
                             variant="outline"
                             size="icon"
                             onClick={() => {
-                              setEditPrinters(editPrinters.filter((_, i) => i !== index));
+                              setEditPrinters(prev => prev.filter((_, i) => i !== index));
                             }}
                           >
                             <Trash2 className="w-4 h-4" />
@@ -633,7 +531,7 @@ export default function ClientesPage() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => setEditPrinters([...editPrinters, ""])}
+                      onClick={() => setEditPrinters(prev => [...prev, ""])}
                       className="w-full"
                     >
                       <Plus className="w-4 h-4 mr-2" />
@@ -661,23 +559,10 @@ export default function ClientesPage() {
                           <SelectItem value="BAJA">Baja Prioridad (1 cada 6+ meses)</SelectItem>
                         </SelectContent>
                       </Select>
-                      {errorsEdit.tipoCliente && (
-                        <p className="text-sm text-destructive">
-                          {errorsEdit.tipoCliente.message}
-                        </p>
-                      )}
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="edit-proveedorActual">Proveedor Actual</Label>
-                      <Input
-                        id="edit-proveedorActual"
-                        {...registerEdit("proveedorActual")}
-                      />
-                      {errorsEdit.proveedorActual && (
-                        <p className="text-sm text-destructive">
-                          {errorsEdit.proveedorActual.message}
-                        </p>
-                      )}
+                      <Input id="edit-proveedorActual" {...registerEdit("proveedorActual")} />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="edit-status">Estado *</Label>
@@ -696,11 +581,6 @@ export default function ClientesPage() {
                           <SelectItem value="active">Cliente Activo</SelectItem>
                         </SelectContent>
                       </Select>
-                      {errorsEdit.status && (
-                        <p className="text-sm text-destructive">
-                          {errorsEdit.status.message}
-                        </p>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -744,10 +624,10 @@ export default function ClientesPage() {
               </button>
             ))}
           </div>
-        </div >
+        </div>
 
         {/* Clients Table - Desktop */}
-        < Card className="hidden lg:block" >
+        <Card className="hidden lg:block">
           <CardHeader>
             <CardTitle>Lista de Contactos</CardTitle>
             <CardDescription>
@@ -829,7 +709,6 @@ export default function ClientesPage() {
                           <Badge className={statusColorMap[clientStatus.color]}>
                             {clientStatus.label}
                           </Badge>
-
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
@@ -839,9 +718,7 @@ export default function ClientesPage() {
                                 size="icon"
                                 title="Enviar WhatsApp"
                                 onClick={() => {
-                                  // Sanitize phone number (remove non-digits)
                                   const rawPhone = client.phone.replace(/\D/g, '');
-                                  // Add country code if missing (assuming Argentina +54)
                                   const phone = rawPhone.startsWith('54') ? rawPhone : `54${rawPhone}`;
                                   window.open(`https://wa.me/${phone}`, '_blank');
                                 }}
@@ -874,17 +751,14 @@ export default function ClientesPage() {
                                     Editar
                                   </DropdownMenuItem>
                                 )}
-
                                 {(user?.role === "admin" || user?.role === "owner") && (
-                                  <>
-                                    <DropdownMenuItem
-                                      className="text-destructive focus:text-destructive"
-                                      onClick={() => confirmDelete(client)}
-                                    >
-                                      <Trash2 className="w-4 h-4 mr-2" />
-                                      Eliminar
-                                    </DropdownMenuItem>
-                                  </>
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={() => confirmDelete(client)}
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Eliminar
+                                  </DropdownMenuItem>
                                 )}
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -897,104 +771,83 @@ export default function ClientesPage() {
               </Table>
             </div>
           </CardContent>
-        </Card >
+        </Card>
 
         {/* Clients Cards - Mobile/Tablet */}
-        < div className="lg:hidden space-y-4" >
-          {
-            filteredClients.map((client) => {
-              const clientStatus = getClientStatus(client.status);
-              const clientPriority = getClientPriority(client.priority);
-
-              return (
-                <Card key={client.id}>
-                  <CardContent className="pt-6">
-                    <div className="flex items-start justify-between gap-4 mb-4">
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between">
-                          <h3 className="font-medium text-foreground">
-                            {client.name}
-                          </h3>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 -mt-1 -mr-2">
-                                <MoreHorizontal className="w-4 h-4" />
-                                <span className="sr-only">Abrir menú</span>
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openDetailsDialog(client)}>
-                                <Eye className="w-4 h-4 mr-2" />
-                                Ver
+        <div className="lg:hidden space-y-4">
+          {filteredClients.map((client) => {
+            const clientStatus = getClientStatus(client.status);
+            const clientPriority = getClientPriority(client.priority);
+            return (
+              <Card key={client.id}>
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between gap-4 mb-4">
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between">
+                        <h3 className="font-medium text-foreground">{client.name}</h3>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 -mt-1 -mr-2">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openDetailsDialog(client)}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              Ver
+                            </DropdownMenuItem>
+                            {(user?.role === "vendedor" || user?.role === "owner") && (
+                              <DropdownMenuItem onClick={() => openEditDialog(client)}>
+                                <Pencil className="w-4 h-4 mr-2" />
+                                Editar
                               </DropdownMenuItem>
-                              {(user?.role === "vendedor" || user?.role === "owner") && (
-                                <DropdownMenuItem onClick={() => openEditDialog(client)}>
-                                  <Pencil className="w-4 h-4 mr-2" />
-                                  Editar
-                                </DropdownMenuItem>
-                              )}
-
-                              {(user?.role === "admin" || user?.role === "owner") && (
-                                <>
-                                  <DropdownMenuItem
-                                    className="text-destructive focus:text-destructive"
-                                    onClick={() => confirmDelete(client)}
-                                  >
-                                    <Trash2 className="w-4 h-4 mr-2" />
-                                    Eliminar
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
-                          <Building2 className="w-3.5 h-3.5" />
-                          {client.industry || "-"}
-                        </div>
+                            )}
+                            {(user?.role === "admin" || user?.role === "owner") && (
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => confirmDelete(client)}
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Eliminar
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                        <Building2 className="w-3.5 h-3.5" />
+                        {client.industry || "-"}
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      <Badge className={statusColorMap[clientStatus.color]}>
-                        {clientStatus.label}
-                      </Badge>
-                      {client.tipoCliente && (
-                        <Badge variant="outline" className="text-xs">
-                          {clientPriority.label}
-                        </Badge>
-                      )}
+                  </div>
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <Badge className={statusColorMap[clientStatus.color]}>
+                      {clientStatus.label}
+                    </Badge>
+                  </div>
+                  <div className="space-y-2 text-sm mb-4">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Phone className="w-4 h-4" />
+                      {client.phone}
                     </div>
-                    <div className="space-y-2 text-sm mb-4">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Phone className="w-4 h-4" />
-                        {client.phone}
-                      </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <MapPin className="w-4 h-4 shrink-0" />
-                        <span className="truncate">{client.address || "-"}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Printer className="w-4 h-4 shrink-0" />
-                        <span className="truncate">
-                          {client.printers && client.printers.length > 0
-                            ? client.printers.map(p => p.printer_model).join(", ")
-                            : client.maquinas || "-"}
-                        </span>
-                      </div>
-                      {client.proveedorActual && (
-                        <div className="text-muted-foreground">
-                          <span className="font-medium">Proveedor:</span> {client.proveedorActual}
-                        </div>
-                      )}
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <MapPin className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{client.address || "-"}</span>
                     </div>
-
-
-                  </CardContent>
-                </Card>
-              );
-            })
-          }
-        </div >
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Printer className="w-4 h-4 shrink-0" />
+                      <span className="truncate">
+                        {client.printers && client.printers.length > 0
+                          ? client.printers.map(p => p.printer_model).join(", ")
+                          : client.maquinas || "-"}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
 
         {/* Pagination Controls */}
         <PaginationControls
@@ -1006,32 +859,24 @@ export default function ClientesPage() {
         />
 
         {/* Empty State */}
-        {
-          filteredClients.length === 0 && (
-            <div className="text-center py-12">
-              <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-foreground mb-1">
-                No se encontraron contactos
-              </h3>
-              <p className="text-muted-foreground">
-                Intenta con otros términos de búsqueda o cambia el filtro de estado
-              </p>
-            </div>
-          )
-        }
-
-
-
-
+        {filteredClients.length === 0 && !isLoading && (
+          <div className="text-center py-12">
+            <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-foreground mb-1">
+              No se encontraron contactos
+            </h3>
+            <p className="text-muted-foreground">
+              Intenta con otros términos de búsqueda o cambia el filtro de estado
+            </p>
+          </div>
+        )}
 
         {/* Client Details Modal */}
         <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
           <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Detalles del Cliente</DialogTitle>
-              <DialogDescription>
-                Información completa del cliente
-              </DialogDescription>
+              <DialogDescription>Información completa del cliente</DialogDescription>
             </DialogHeader>
             {clientToView && (
               <div className="space-y-6">
@@ -1060,22 +905,19 @@ export default function ClientesPage() {
                   <div className="grid gap-4">
                     <div>
                       <Label className="text-muted-foreground text-xs flex items-center gap-1">
-                        <Phone className="w-3 h-3" />
-                        Teléfono
+                        <Phone className="w-3 h-3" /> Teléfono
                       </Label>
                       <p className="text-sm">{clientToView.phone || "-"}</p>
                     </div>
                     <div>
                       <Label className="text-muted-foreground text-xs flex items-center gap-1">
-                        <Mail className="w-3 h-3" />
-                        Email
+                        <Mail className="w-3 h-3" /> Email
                       </Label>
                       <p className="text-sm">{clientToView.email || "-"}</p>
                     </div>
                     <div>
                       <Label className="text-muted-foreground text-xs flex items-center gap-1">
-                        <MapPin className="w-3 h-3" />
-                        Dirección
+                        <MapPin className="w-3 h-3" /> Dirección
                       </Label>
                       <p className="text-sm">{clientToView.address || "-"}</p>
                     </div>
@@ -1086,8 +928,7 @@ export default function ClientesPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label className="text-muted-foreground text-xs flex items-center gap-1">
-                        <Building2 className="w-3 h-3" />
-                        Industria
+                        <Building2 className="w-3 h-3" /> Industria
                       </Label>
                       <p className="text-sm">{clientToView.industry || "-"}</p>
                     </div>
@@ -1106,13 +947,12 @@ export default function ClientesPage() {
                   </div>
                   <div>
                     <Label className="text-muted-foreground text-xs">Proveedor Actual</Label>
-                    <p className="text-sm">{clientToView.proveedorActual || "-"}</p>
+                    <p className="text-sm">{clientToView.proveedor_actual || "-"}</p>
                   </div>
                 </div>
                 <div className="space-y-4 pt-4 border-t">
                   <h4 className="font-medium text-sm flex items-center gap-1">
-                    <Printer className="w-4 h-4" />
-                    Impresoras
+                    <Printer className="w-4 h-4" /> Impresoras
                   </h4>
                   {clientToView.printers && clientToView.printers.length > 0 ? (
                     <div className="space-y-2">
@@ -1129,26 +969,14 @@ export default function ClientesPage() {
                     </p>
                   )}
                 </div>
-                {clientToView.notes && (
-                  <div className="space-y-2 pt-4 border-t">
-                    <Label className="text-muted-foreground text-xs">Notas</Label>
-                    <p className="text-sm whitespace-pre-wrap bg-muted/30 p-3 rounded">
-                      {clientToView.notes}
-                    </p>
-                  </div>
-                )}
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t text-xs text-muted-foreground">
                   <div>
                     <Label className="text-muted-foreground text-xs">Creado</Label>
-                    <p className="text-sm">
-                      {new Date(clientToView.created_at).toLocaleDateString("es-AR")}
-                    </p>
+                    <p className="text-sm">{new Date(clientToView.created_at).toLocaleDateString("es-AR")}</p>
                   </div>
                   <div>
                     <Label className="text-muted-foreground text-xs">Actualizado</Label>
-                    <p className="text-sm">
-                      {new Date(clientToView.updated_at).toLocaleDateString("es-AR")}
-                    </p>
+                    <p className="text-sm">{new Date(clientToView.updated_at).toLocaleDateString("es-AR")}</p>
                   </div>
                 </div>
               </div>
@@ -1181,7 +1009,7 @@ export default function ClientesPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div >
-    </Suspense >
+      </div>
+    </Suspense>
   );
 }

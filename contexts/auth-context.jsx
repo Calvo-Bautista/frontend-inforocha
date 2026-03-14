@@ -12,21 +12,18 @@ export function AuthProvider({ children }) {
   const [error, setError] = useState(null);
   const router = useRouter();
 
-  // Check for existing session on mount
+  // Check for existing session on mount (via HttpOnly cookie or localStorage fallback)
   useEffect(() => {
     const initAuth = async () => {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-
-      if (token) {
-        try {
-          // Verify token is still valid by fetching user data
-          const userData = await authAPI.getMe();
-          setUser(userData);
-        } catch (err) {
-          // Token is invalid or expired
-          console.error('Session validation failed:', err);
-          authAPI.logout();
-        }
+      try {
+        // Try to validate session — if an HttpOnly cookie or localStorage token exists,
+        // the backend will authenticate the request automatically
+        const userData = await authAPI.getMe();
+        setUser(userData);
+      } catch (err) {
+        // No valid session (no cookie, no localStorage token, or token expired)
+        // Silently clear any stale localStorage token
+        authAPI.logout();
       }
 
       setIsLoading(false);
@@ -40,7 +37,7 @@ export function AuthProvider({ children }) {
     setError(null);
 
     try {
-      // Call real login API
+      // Call real login API — sets HttpOnly cookie + localStorage fallback
       const { access_token } = await authAPI.login(email, password);
 
       // Fetch user data after successful login
@@ -57,8 +54,8 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const logout = useCallback(() => {
-    authAPI.logout();
+  const logout = useCallback(async () => {
+    await authAPI.logout();
     setUser(null);
     setError(null);
     router.replace("/");

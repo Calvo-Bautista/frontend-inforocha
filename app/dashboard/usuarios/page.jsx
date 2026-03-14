@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/auth-context";
 import SettingsModal from "./components/settings-modal";
 import AssignSubstituteModal from "./components/assign-substitute-modal";
 import { usersAPI } from "@/lib/api";
+import { useUsers, useUserStats } from "@/lib/api-hooks";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -95,10 +96,32 @@ const roleLabels = {
 };
 
 export default function UsuariosPage() {
-  const [users, setUsers] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { user } = useAuth();
+
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [limit] = useState(8);
+
+  // Search State
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPage(1); // Reset page on search change
+      setDebouncedSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Data Fetching with SWR
+  const { users, total: totalItems, isLoading, isError: error, mutate } = useUsers({
+    skip: (page - 1) * limit,
+    limit,
+    search: debouncedSearch
+  });
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
@@ -106,7 +129,7 @@ export default function UsuariosPage() {
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
-  const { user } = useAuth();
+
   const [userToEdit, setUserToEdit] = useState(null);
   const [userToChangePassword, setUserToChangePassword] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -115,52 +138,6 @@ export default function UsuariosPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubstituteOpen, setIsSubstituteOpen] = useState(false);
   const [userToSubstitute, setUserToSubstitute] = useState(null);
-
-  // Pagination State
-  const [page, setPage] = useState(1);
-  const [limit] = useState(8);
-  const [totalItems, setTotalItems] = useState(0);
-
-  // Reset page to 1 when search changes
-  useEffect(() => {
-    setPage(1);
-  }, [searchTerm]);
-
-  // Fetch users from API
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        setIsLoading(true);
-        const params = {
-          skip: (page - 1) * limit,
-          limit: limit,
-        };
-        if (searchTerm) {
-          params.search = searchTerm;
-        }
-
-        const data = await usersAPI.getAll(params);
-        setUsers(data);
-        if (data.total !== undefined) {
-          setTotalItems(data.total);
-        }
-      } catch (err) {
-        console.error("Error fetching users:", err);
-        setError(err.message);
-        toast.error("Error al cargar usuarios", {
-          description: err.message,
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    const timer = setTimeout(() => {
-      fetchUsers();
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [searchTerm, page, limit]);
 
   // Form for creating new user
   const {
@@ -202,8 +179,8 @@ export default function UsuariosPage() {
     },
   });
 
-  // Filter users by search term (Server side handled)
-  const filteredUsers = users;
+  // Users list from SWR
+  const filteredUsers = users || [];
 
   const handleCreateUser = async (data) => {
     setIsSubmitting(true);
@@ -216,11 +193,11 @@ export default function UsuariosPage() {
         password: data.password,
       };
 
-      const createdUser = await usersAPI.create(userData);
-      setUsers((prev) => [...prev, createdUser]);
+      await usersAPI.create(userData);
+      mutate(); // Revalidate SWR cache
 
       toast.success("Usuario creado", {
-        description: `${createdUser.name} ha sido agregado al sistema`,
+        description: `${userData.name} ha sido agregado al sistema`,
       });
 
       setIsCreateOpen(false);
@@ -243,10 +220,7 @@ export default function UsuariosPage() {
 
     try {
       const updatedUser = await usersAPI.update(userToEdit.id, data);
-
-      setUsers((prev) =>
-        prev.map((u) => (u.id === userToEdit.id ? updatedUser : u))
-      );
+      mutate(); // Revalidate SWR cache
 
       toast.success("Usuario actualizado", {
         description: `${updatedUser.name} ha sido actualizado`,
@@ -300,8 +274,7 @@ export default function UsuariosPage() {
 
     try {
       await usersAPI.delete(userToDelete.id);
-
-      setUsers((prev) => prev.filter((u) => u.id !== userToDelete.id));
+      mutate(); // Revalidate SWR cache
 
       toast.success("Usuario eliminado", {
         description: `${userToDelete.name} ha sido eliminado del sistema`,
@@ -346,17 +319,15 @@ export default function UsuariosPage() {
   };
 
   const handleSubstituteSuccess = () => {
-    // Refresh users list to show updated status
-    usersAPI.getAll({ skip: (page - 1) * limit, limit, search: searchTerm }).then(data => {
-      setUsers(data);
-      if (data.total !== undefined) setTotalItems(data.total);
-    });
+    mutate(); // Refresh users list
   };
 
-  const vendedores = users.filter((u) => u.role === "vendedor").length;
-  const logisticos = users.filter((u) => u.role === "logistica").length;
-  const admins = users.filter((u) => u.role === "admin").length;
-  const owners = users.filter((u) => u.role === "owner").length;
+  // Global user counts by role (not paginated)
+  const { stats: userStats } = useUserStats();
+  const vendedores = userStats.vendedor;
+  const logisticos = userStats.logistica;
+  const admins = userStats.admin;
+  const owners = userStats.owner;
 
   if (isLoading) {
     return (

@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { formatCurrency, getStockStatus } from "@/lib/mock-data";
 import { productsAPI } from "@/lib/api";
+import { useProducts } from "@/lib/api-hooks";
 import { useWebSocket } from "@/contexts/websocket-context";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
@@ -48,31 +49,26 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import Loading from "./loading";
 import { ImportProductsModal } from "./components/import-modal";
-import { PaginationControls } from "@/components/ui/pagination-controls"; // Import
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { toast } from "sonner";
 
 export default function ProductosPage() {
   const { user } = useAuth();
-  const [products, setProducts] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [refreshTrigger, setRefreshTrigger] = useState(0); // Trigger to refresh list
   const searchParams = useSearchParams();
 
   // Pagination State
   const [page, setPage] = useState(1);
   const [limit] = useState(8);
-  const [totalItems, setTotalItems] = useState(0);
 
   // Modal states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [isImportOpen, setIsImportOpen] = useState(false); // Import modal state
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false); // New state for download loading
+  const [isDownloading, setIsDownloading] = useState(false);
   const [productToEdit, setProductToEdit] = useState(null);
   const [productToDelete, setProductToDelete] = useState(null);
 
@@ -94,15 +90,13 @@ export default function ProductosPage() {
     category: "",
   });
 
-  // Debounced search term to avoid losing focus
+  // Debounced search term
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
 
-  // Debounce search term
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
-    }, 500); // 500ms delay
-
+    }, 500);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
@@ -111,57 +105,25 @@ export default function ProductosPage() {
     setPage(1);
   }, [categoryFilter, debouncedSearchTerm]);
 
-  // Fetch products from API
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
+  // Build SWR params
+  const queryParams = useMemo(() => {
+    const params = { skip: (page - 1) * limit, limit };
+    if (categoryFilter !== "all") params.category = categoryFilter;
+    if (debouncedSearchTerm) params.search = debouncedSearchTerm;
+    return params;
+  }, [page, limit, categoryFilter, debouncedSearchTerm]);
 
-        const params = {
-          skip: (page - 1) * limit,
-          limit: limit,
-        };
-        if (categoryFilter !== "all") {
-          params.category = categoryFilter;
-        }
-        if (debouncedSearchTerm) {
-          params.search = debouncedSearchTerm;
-        }
+  // Data Fetching with SWR
+  const { products, total: totalItems, isLoading, isError: error, mutate } = useProducts(queryParams);
 
-        const data = await productsAPI.getAll(params);
-        setProducts(data);
-        if (data.total !== undefined) {
-          setTotalItems(data.total);
-        }
-      } catch (err) {
-        console.error("Error fetching products:", err);
-        setError(err.message);
-        toast.error("Error al cargar productos", {
-          description: err.message,
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchProducts();
-  }, [categoryFilter, debouncedSearchTerm, page, limit, refreshTrigger]);
-
-  // WebSocket updates
+  // WebSocket: update stock in-place without a full mutate
   const { lastMessage } = useWebSocket();
-
   useEffect(() => {
     if (lastMessage && lastMessage.type === "stock_update") {
-      const { product_id, new_stock } = lastMessage;
-
-      setProducts(prevProducts =>
-        prevProducts.map(p =>
-          p.id === product_id ? { ...p, stock: new_stock } : p
-        )
-      );
+      // Trigger SWR revalidation so the cache stays fresh
+      mutate();
     }
-  }, [lastMessage]);
+  }, [lastMessage, mutate]);
 
   const categories = [
     { value: "all", label: "Todos" },
@@ -174,7 +136,6 @@ export default function ProductosPage() {
   const handleCreateProduct = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-
     try {
       const productData = {
         articulo: newProduct.articulo,
@@ -183,27 +144,15 @@ export default function ProductosPage() {
         stock: parseInt(newProduct.stock),
         category: newProduct.category,
       };
-
-      const createdProduct = await productsAPI.create(productData);
-      setProducts((prev) => [...prev, createdProduct]);
-
+      await productsAPI.create(productData);
+      mutate(); // Revalidate SWR cache
       toast.success("Producto creado", {
-        description: `${createdProduct.articulo} ha sido agregado al inventario`,
+        description: `${productData.articulo} ha sido agregado al inventario`,
       });
-
       setIsCreateOpen(false);
-      setNewProduct({
-        articulo: "",
-        description: "",
-        price: "",
-        stock: "",
-        category: "",
-      });
+      setNewProduct({ articulo: "", description: "", price: "", stock: "", category: "" });
     } catch (err) {
-      console.error("Error creating product:", err);
-      toast.error("Error al crear producto", {
-        description: err.message,
-      });
+      toast.error("Error al crear producto", { description: err.message });
     } finally {
       setIsSubmitting(false);
     }
@@ -224,9 +173,7 @@ export default function ProductosPage() {
   const handleEditProduct = async (e) => {
     e.preventDefault();
     if (!productToEdit) return;
-
     setIsSubmitting(true);
-
     try {
       const productData = {
         articulo: editProduct.articulo,
@@ -235,24 +182,15 @@ export default function ProductosPage() {
         stock: parseInt(editProduct.stock),
         category: editProduct.category,
       };
-
-      const updatedProduct = await productsAPI.update(productToEdit.id, productData);
-
-      setProducts((prev) =>
-        prev.map((p) => (p.id === productToEdit.id ? updatedProduct : p))
-      );
-
+      await productsAPI.update(productToEdit.id, productData);
+      mutate(); // Revalidate SWR cache
       toast.success("Producto actualizado", {
-        description: `${updatedProduct.articulo} ha sido actualizado`,
+        description: `${productData.articulo} ha sido actualizado`,
       });
-
       setIsEditOpen(false);
       setProductToEdit(null);
     } catch (err) {
-      console.error("Error updating product:", err);
-      toast.error("Error al actualizar producto", {
-        description: err.message,
-      });
+      toast.error("Error al actualizar producto", { description: err.message });
     } finally {
       setIsSubmitting(false);
     }
@@ -260,26 +198,17 @@ export default function ProductosPage() {
 
   const handleDeleteProduct = async () => {
     if (!productToDelete) return;
-
     setIsSubmitting(true);
-
     try {
-      // Mark as inactive instead of deleting
       await productsAPI.update(productToDelete.id, { is_active: false });
-
-      setProducts((prev) => prev.filter((p) => p.id !== productToDelete.id));
-
+      mutate(); // Revalidate SWR cache
       toast.success("Producto eliminado", {
-        description: `${productToDelete.name} ha sido marcado como inactivo`,
+        description: `${productToDelete.articulo} ha sido marcado como inactivo`,
       });
-
       setIsDeleteOpen(false);
       setProductToDelete(null);
     } catch (err) {
-      console.error("Error deleting product:", err);
-      toast.error("Error al eliminar producto", {
-        description: err.message,
-      });
+      toast.error("Error al eliminar producto", { description: err.message });
     } finally {
       setIsSubmitting(false);
     }
@@ -288,18 +217,10 @@ export default function ProductosPage() {
   const handleDownloadBudget = async () => {
     try {
       setIsDownloading(true);
-
       const params = {};
-      if (categoryFilter !== "all") {
-        params.category = categoryFilter;
-      }
-      if (debouncedSearchTerm) {
-        params.search = debouncedSearchTerm;
-      }
-
+      if (categoryFilter !== "all") params.category = categoryFilter;
+      if (debouncedSearchTerm) params.search = debouncedSearchTerm;
       const blob = await productsAPI.downloadBudget(params);
-
-      // Create a URL for the blob
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -308,13 +229,9 @@ export default function ProductosPage() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-
       toast.success("Presupuesto descargado con éxito");
     } catch (err) {
-      console.error("Error downloading budget:", err);
-      toast.error("Error al descargar presupuesto", {
-        description: err.message,
-      });
+      toast.error("Error al descargar presupuesto", { description: err.message });
     } finally {
       setIsDownloading(false);
     }
@@ -328,14 +245,14 @@ export default function ProductosPage() {
     <Suspense fallback={<Loading />}>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Productos</h1>
             <p className="text-muted-foreground">
               Consulta el inventario y disponibilidad de stock
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button
               variant="outline"
               onClick={handleDownloadBudget}
@@ -347,7 +264,7 @@ export default function ProductosPage() {
               ) : (
                 <Download className="w-4 h-4" />
               )}
-              Descargar Presupuesto
+              <span className="hidden sm:inline">Descargar</span> Presupuesto
             </Button>
 
             {user?.role === "owner" && (
@@ -355,14 +272,14 @@ export default function ProductosPage() {
                 <Button
                   variant="outline"
                   onClick={() => setIsImportOpen(true)}
-                  className="gap-2 hidden sm:flex border-dashed"
+                  className="gap-2 border-dashed"
                 >
                   <FileSpreadsheet className="w-4 h-4" />
-                  Importar Excel
+                  <span className="hidden sm:inline">Importar Excel</span>
                 </Button>
                 <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
                   <Plus className="w-4 h-4" />
-                  Nuevo Producto
+                  <span className="hidden sm:inline">Nuevo</span> Producto
                 </Button>
               </>
             )}
@@ -377,7 +294,7 @@ export default function ProductosPage() {
                 <AlertCircle className="w-5 h-5" />
                 <p className="font-medium">Error al cargar productos</p>
               </div>
-              <p className="text-sm text-muted-foreground mt-2">{error}</p>
+              <p className="text-sm text-muted-foreground mt-2">{error.message}</p>
             </CardContent>
           </Card>
         )}
@@ -534,7 +451,7 @@ export default function ProductosPage() {
                     placeholder="Ej: TN-450"
                     value={newProduct.articulo}
                     onChange={(e) =>
-                      setNewProduct({ ...newProduct, articulo: e.target.value })
+                      setNewProduct(prev => ({ ...prev, articulo: e.target.value }))
                     }
                     required
                   />
@@ -546,7 +463,7 @@ export default function ProductosPage() {
                     placeholder="Descripción del producto..."
                     value={newProduct.description}
                     onChange={(e) =>
-                      setNewProduct({ ...newProduct, description: e.target.value })
+                      setNewProduct(prev => ({ ...prev, description: e.target.value }))
                     }
                     rows={3}
                     required
@@ -563,7 +480,7 @@ export default function ProductosPage() {
                       placeholder="0.0000"
                       value={newProduct.price}
                       onChange={(e) =>
-                        setNewProduct({ ...newProduct, price: e.target.value })
+                        setNewProduct(prev => ({ ...prev, price: e.target.value }))
                       }
                       required
                     />
@@ -577,7 +494,7 @@ export default function ProductosPage() {
                       placeholder="0"
                       value={newProduct.stock}
                       onChange={(e) =>
-                        setNewProduct({ ...newProduct, stock: e.target.value })
+                        setNewProduct(prev => ({ ...prev, stock: e.target.value }))
                       }
                       required
                     />
@@ -588,7 +505,7 @@ export default function ProductosPage() {
                   <Select
                     value={newProduct.category}
                     onValueChange={(value) =>
-                      setNewProduct({ ...newProduct, category: value })
+                      setNewProduct(prev => ({ ...prev, category: value }))
                     }
                     required
                   >
@@ -645,7 +562,7 @@ export default function ProductosPage() {
                     id="edit-articulo"
                     value={editProduct.articulo}
                     onChange={(e) =>
-                      setEditProduct({ ...editProduct, articulo: e.target.value })
+                      setEditProduct(prev => ({ ...prev, articulo: e.target.value }))
                     }
                     required
                   />
@@ -656,7 +573,7 @@ export default function ProductosPage() {
                     id="edit-description"
                     value={editProduct.description}
                     onChange={(e) =>
-                      setEditProduct({ ...editProduct, description: e.target.value })
+                      setEditProduct(prev => ({ ...prev, description: e.target.value }))
                     }
                     rows={3}
                     required
@@ -672,7 +589,7 @@ export default function ProductosPage() {
                       min="0"
                       value={editProduct.price}
                       onChange={(e) =>
-                        setEditProduct({ ...editProduct, price: e.target.value })
+                        setEditProduct(prev => ({ ...prev, price: e.target.value }))
                       }
                       required
                     />
@@ -685,7 +602,7 @@ export default function ProductosPage() {
                       min="0"
                       value={editProduct.stock}
                       onChange={(e) =>
-                        setEditProduct({ ...editProduct, stock: e.target.value })
+                        setEditProduct(prev => ({ ...prev, stock: e.target.value }))
                       }
                       required
                     />
@@ -696,7 +613,7 @@ export default function ProductosPage() {
                   <Select
                     value={editProduct.category}
                     onValueChange={(value) =>
-                      setEditProduct({ ...editProduct, category: value })
+                      setEditProduct(prev => ({ ...prev, category: value }))
                     }
                     required
                   >
@@ -741,7 +658,7 @@ export default function ProductosPage() {
           onClose={() => setIsImportOpen(false)}
           onSuccess={() => {
             setIsImportOpen(false);
-            setRefreshTrigger(prev => prev + 1);
+            mutate(); // Revalidate SWR cache
             setPage(1);
           }}
         />
@@ -775,7 +692,7 @@ export default function ProductosPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
+      </div >
     </Suspense >
   );
 }

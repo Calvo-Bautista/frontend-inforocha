@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { formatCurrency, getOrderStatus } from "@/lib/mock-data";
 import { ordersAPI } from "@/lib/api";
+import { useOrders, useOrderStats } from "@/lib/api-hooks";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -88,9 +89,8 @@ const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
 export default function DespachosPage() {
-  const [ordersList, setOrdersList] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [monthFilter, setMonthFilter] = useState((new Date().getMonth() + 1).toString());
   const [yearFilter, setYearFilter] = useState(currentYear.toString());
@@ -98,123 +98,61 @@ export default function DespachosPage() {
   // Pagination State
   const [page, setPage] = useState(1);
   const [limit] = useState(8);
-  const [totalItems, setTotalItems] = useState(0);
 
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [stats, setStats] = useState({
-    pending: 0,
-    inPreparation: 0,
-    shipped: 0,
-    delivered: 0
-  });
+
+  // Debounce search term (500ms)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Reset page to 1 when filters change
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, searchTerm, monthFilter, yearFilter]);
+  }, [statusFilter, debouncedSearchTerm, monthFilter, yearFilter]);
 
-  // Fetch orders from API
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        setIsLoading(true);
-        const params = {
-          skip: (page - 1) * limit,
-          limit: limit,
-        };
-        if (statusFilter !== "all") {
-          params.status = statusFilter;
-        }
-        if (searchTerm) {
-          params.search = searchTerm;
-        }
-        if (monthFilter !== "all") {
-          params.month = parseInt(monthFilter);
-        }
-        if (yearFilter !== "all") {
-          params.year = parseInt(yearFilter);
-        }
+  // Build SWR params for orders list
+  const ordersParams = useMemo(() => {
+    const params = { skip: (page - 1) * limit, limit };
+    if (statusFilter !== "all") params.status = statusFilter;
+    if (debouncedSearchTerm) params.search = debouncedSearchTerm;
+    if (monthFilter !== "all") params.month = parseInt(monthFilter);
+    if (yearFilter !== "all") params.year = parseInt(yearFilter);
+    return params;
+  }, [page, limit, statusFilter, debouncedSearchTerm, monthFilter, yearFilter]);
 
-        const data = await ordersAPI.getAll(params);
-        setOrdersList(data);
-        if (data.total !== undefined) {
-          setTotalItems(data.total);
-        }
-      } catch (err) {
-        console.error("Error fetching orders:", err);
-        toast.error("Error al cargar órdenes", {
-          description: err.message,
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    // Simple debounce via timeout
-    const timer = setTimeout(() => {
-      fetchOrders();
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [statusFilter, searchTerm, page, limit, monthFilter, yearFilter]);
-
-  // Fetch stats function
-  const fetchStats = async () => {
-    try {
-      const params = {};
-      if (monthFilter !== "all") {
-        params.month = parseInt(monthFilter);
-      }
-      if (yearFilter !== "all") {
-        params.year = parseInt(yearFilter);
-      }
-
-      const data = await ordersAPI.getStats(params);
-      setStats({
-        pending: data.by_status.pendiente || 0,
-        inPreparation: data.by_status.preparacion || 0,
-        shipped: data.by_status.enviado || 0,
-        delivered: data.by_status.entregado || 0
-      });
-    } catch (err) {
-      console.error("Error fetching stats:", err);
-    }
-  };
-
-  // Fetch stats on filter change
-  useEffect(() => {
-    fetchStats();
+  // Build SWR params for stats (month/year only)
+  const statsParams = useMemo(() => {
+    const params = {};
+    if (monthFilter !== "all") params.month = parseInt(monthFilter);
+    if (yearFilter !== "all") params.year = parseInt(yearFilter);
+    return params;
   }, [monthFilter, yearFilter]);
 
-  const shippableOrders = useMemo(() => {
-    return ordersList;
-  }, [ordersList]);
+  // Data Fetching with SWR
+  const { orders: ordersList, total: totalItems, mutate } = useOrders(ordersParams);
+  const { stats: statsData } = useOrderStats(statsParams);
 
-  const filteredOrders = useMemo(() => {
-    return shippableOrders;
-  }, [shippableOrders]);
+  const stats = {
+    pending: statsData?.by_status?.pendiente || 0,
+    inPreparation: statsData?.by_status?.preparacion || 0,
+    shipped: statsData?.by_status?.enviado || 0,
+    delivered: statsData?.by_status?.entregado || 0,
+  };
+
+  const filteredOrders = ordersList;
 
   const handleStatusChange = async (orderId, newStatus) => {
     try {
       await ordersAPI.update(orderId, { status: newStatus });
-      setOrdersList((prev) =>
-        prev.map((order) =>
-          order.id === orderId ? { ...order, status: newStatus } : order
-        )
-      );
+      mutate(); // Revalidate orders & stats SWR cache
       toast.success("Estado actualizado exitosamente");
-
-      // Refresh stats
-      fetchStats();
     } catch (err) {
-      console.error("Error updating order status:", err);
-      toast.error("Error al actualizar estado", {
-        description: err.message,
-      });
+      toast.error("Error al actualizar estado", { description: err.message });
     }
   };
-
 
   const handleDownloadRemito = async (orderId, orderNumber) => {
     try {
@@ -229,26 +167,9 @@ export default function DespachosPage() {
       document.body.removeChild(a);
       toast.success("Remito descargado");
     } catch (err) {
-      console.error("Error downloading remito:", err);
-      toast.error("Error al descargar remito", {
-        description: err.message,
-      });
+      toast.error("Error al descargar remito", { description: err.message });
     }
   };
-
-  const ordersByStatus = useMemo(() => {
-    return {
-      pendiente: shippableOrders.filter((o) => o.status === "pendiente"),
-      preparacion: shippableOrders.filter((o) => o.status === "preparacion"),
-      enviado: shippableOrders.filter((o) => o.status === "enviado"),
-      entregado: shippableOrders.filter((o) => o.status === "entregado"),
-    };
-  }, [shippableOrders]);
-
-  const pending = stats.pending;
-  const inPreparation = stats.inPreparation;
-  const shipped = stats.shipped;
-  const delivered = stats.delivered;
 
   const openDetail = (order) => {
     setSelectedOrder(order);
@@ -292,10 +213,7 @@ export default function DespachosPage() {
             />
           </div>
           <div className="flex gap-2">
-            <Select
-              value={monthFilter}
-              onValueChange={setMonthFilter}
-            >
+            <Select value={monthFilter} onValueChange={setMonthFilter}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Mes" />
               </SelectTrigger>
@@ -309,10 +227,7 @@ export default function DespachosPage() {
               </SelectContent>
             </Select>
 
-            <Select
-              value={yearFilter}
-              onValueChange={setYearFilter}
-            >
+            <Select value={yearFilter} onValueChange={setYearFilter}>
               <SelectTrigger className="w-[100px]">
                 <SelectValue placeholder="Año" />
               </SelectTrigger>
@@ -355,7 +270,7 @@ export default function DespachosPage() {
                 <Receipt className="w-6 h-6 text-secondary-foreground" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{pending}</p>
+                <p className="text-2xl font-bold">{stats.pending}</p>
                 <p className="text-sm text-muted-foreground">Pendientes</p>
               </div>
             </div>
@@ -368,7 +283,7 @@ export default function DespachosPage() {
                 <Package className="w-6 h-6 text-secondary-foreground" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{inPreparation}</p>
+                <p className="text-2xl font-bold">{stats.inPreparation}</p>
                 <p className="text-sm text-muted-foreground">En Preparación</p>
               </div>
             </div>
@@ -381,7 +296,7 @@ export default function DespachosPage() {
                 <Truck className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{shipped}</p>
+                <p className="text-2xl font-bold">{stats.shipped}</p>
                 <p className="text-sm text-muted-foreground">Enviados</p>
               </div>
             </div>
@@ -394,7 +309,7 @@ export default function DespachosPage() {
                 <CheckCircle2 className="w-6 h-6 text-success" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{delivered}</p>
+                <p className="text-2xl font-bold">{stats.delivered}</p>
                 <p className="text-sm text-muted-foreground">Entregados</p>
               </div>
             </div>
@@ -456,7 +371,7 @@ export default function DespachosPage() {
                           </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Button
                           variant="outline"
                           size="sm"
@@ -477,11 +392,9 @@ export default function DespachosPage() {
                         </Button>
                         <Select
                           value={order.status}
-                          onValueChange={(value) =>
-                            handleStatusChange(order.id, value)
-                          }
+                          onValueChange={(value) => handleStatusChange(order.id, value)}
                         >
-                          <SelectTrigger className="w-44">
+                          <SelectTrigger className="w-full sm:w-44">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -603,32 +516,31 @@ export default function DespachosPage() {
 
       {/* Order Detail Modal */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto !p-4 sm:!p-6">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-3">
-              <span>Detalle del Pedido {selectedOrder?.order_number || selectedOrder?.id}</span>
+            <DialogTitle className="flex flex-wrap items-center gap-2 pr-6">
+              <span className="text-base sm:text-lg">Detalle del Pedido {selectedOrder?.order_number || selectedOrder?.id}</span>
               {selectedOrder && (
                 <Badge className={statusColorMap[getOrderStatus(selectedOrder.status).color]}>
                   {getOrderStatus(selectedOrder.status).label}
                 </Badge>
               )}
-              {selectedOrder && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2 ml-auto"
-                  onClick={() => handleDownloadRemito(selectedOrder.id, selectedOrder.order_number)}
-                >
-                  <FileDown className="w-4 h-4" />
-                  Descargar Remito
-                </Button>
-              )}
             </DialogTitle>
+            {selectedOrder && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 w-fit mt-2"
+                onClick={() => handleDownloadRemito(selectedOrder.id, selectedOrder.order_number)}
+              >
+                <FileDown className="w-4 h-4" />
+                Descargar Remito
+              </Button>
+            )}
           </DialogHeader>
 
           {selectedOrder && (
-            <div className="space-y-6 mt-4">
-              {/* Client Info */}
+            <div className="space-y-6 mt-4 min-w-0">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Card>
                   <CardHeader className="pb-3">
@@ -659,10 +571,7 @@ export default function DespachosPage() {
                     <p className="text-sm flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-muted-foreground" />
                       {selectedOrder.created_at ? new Date(selectedOrder.created_at).toLocaleDateString("es-AR", {
-                        weekday: "long",
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
+                        weekday: "long", year: "numeric", month: "long", day: "numeric",
                       }) : "Fecha inválida"}
                     </p>
                     <p className="text-sm flex items-center gap-2">
@@ -676,9 +585,7 @@ export default function DespachosPage() {
                           Factura {selectedOrder.invoice_type}
                         </Badge>
                       ) : (
-                        <Badge variant="secondary">
-                          Sin Factura
-                        </Badge>
+                        <Badge variant="secondary">Sin Factura</Badge>
                       )}
                     </div>
                   </CardContent>
@@ -693,33 +600,35 @@ export default function DespachosPage() {
                     Productos a Preparar ({getTotalItems(selectedOrder.items)} unidades)
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Articulo</TableHead>
-                        <TableHead>Descripción</TableHead>
-                        <TableHead className="text-center">Cant.</TableHead>
-                        <TableHead className="text-right">Subtotal</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {selectedOrder.items.map((item, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell className="font-mono text-xs">{item.product?.articulo || "N/A"}</TableCell>
-                          <TableCell className="font-medium">{item.product?.description || "Eliminado"}</TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant="secondary" className="font-bold text-base">
-                              {item.quantity}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {formatCurrency(item.price_at_time * item.quantity)}
-                          </TableCell>
+                <CardContent className="p-0 sm:p-6">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="hidden sm:table-cell">Articulo</TableHead>
+                          <TableHead>Descripción</TableHead>
+                          <TableHead className="text-center">Cant.</TableHead>
+                          <TableHead className="text-right">Subtotal</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedOrder.items.map((item, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="font-mono text-xs hidden sm:table-cell">{item.product?.articulo || "N/A"}</TableCell>
+                            <TableCell className="font-medium text-sm">{item.product?.description || "Eliminado"}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="secondary" className="font-bold text-base">
+                                {item.quantity}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right whitespace-nowrap">
+                              {formatCurrency(item.price_at_time * item.quantity)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -770,7 +679,7 @@ export default function DespachosPage() {
                 </CardContent>
               </Card>
 
-              {/* Notes, Repair, and Payment Method */}
+              {/* Notes and extras */}
               {(selectedOrder.notes || selectedOrder.repair_description || selectedOrder.payment_method) && (
                 <div className="space-y-3">
                   {selectedOrder.repair_description && (

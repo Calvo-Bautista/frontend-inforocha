@@ -676,7 +676,7 @@ export default function NuevaOrdenPage() {
                 </div>
               )}
 
-              <div className="flex gap-3 items-end">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                 <div className="space-y-2 flex-1 min-w-0">
                   <Label htmlFor="quantity">Cantidad</Label>
                   <Input
@@ -701,11 +701,10 @@ export default function NuevaOrdenPage() {
                 <Button
                   onClick={handleAddToCart}
                   disabled={!selectedProduct || quantity < 1 || (selectedProduct && quantity > selectedProduct.stock)}
-                  size="icon"
-                  className="shrink-0 sm:w-auto sm:px-4 sm:gap-2"
+                  className="w-full sm:w-auto gap-2 shrink-0"
                 >
                   <Plus className="w-4 h-4" />
-                  <span className="hidden sm:inline">Agregar</span>
+                  Agregar
                 </Button>
               </div>
             </CardContent>
@@ -713,8 +712,8 @@ export default function NuevaOrdenPage() {
         </div>
 
         {/* Right Column - Cart */}
-        <div>
-          <Card className="sticky top-6">
+        <div className="min-w-0">
+          <Card className="lg:sticky lg:top-6 overflow-hidden">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ShoppingCart className="w-5 h-5" />

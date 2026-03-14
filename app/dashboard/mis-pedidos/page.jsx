@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { formatCurrency, getOrderStatus } from "@/lib/mock-data";
 import { ordersAPI } from "@/lib/api";
+import { useOrders, useOrderStats } from "@/lib/api-hooks";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -99,8 +100,6 @@ const formatDateUTC = (dateString) => {
 };
 
 export default function MisPedidosPage() {
-  const [orders, setOrders] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [monthFilter, setMonthFilter] = useState((new Date().getMonth() + 1).toString());
@@ -114,99 +113,40 @@ export default function MisPedidosPage() {
 
   // Pagination State
   const [page, setPage] = useState(1);
-
   const [limit] = useState(8);
-  const [totalItems, setTotalItems] = useState(0);
-  const [stats, setStats] = useState({
-    totalOrders: 0,
-    totalRevenue: 0,
-    pending: 0
-  });
 
   // Reset page to 1 when filters change
   useEffect(() => {
     setPage(1);
   }, [statusFilter, searchTerm, monthFilter, yearFilter]);
 
-  // Fetch orders from API
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        setIsLoading(true);
-        const params = {
-          skip: (page - 1) * limit,
-          limit: limit,
-        };
-        if (statusFilter !== "all") {
-          params.status = statusFilter;
-        }
-        if (searchTerm) {
-          params.search = searchTerm;
-        }
-        if (monthFilter !== "all") {
-          params.month = parseInt(monthFilter);
-        }
-        if (yearFilter !== "all") {
-          params.year = parseInt(yearFilter);
-        }
+  // Build SWR params for orders list
+  const ordersParams = useMemo(() => {
+    const params = { skip: (page - 1) * limit, limit };
+    if (statusFilter !== "all") params.status = statusFilter;
+    if (searchTerm) params.search = searchTerm;
+    if (monthFilter !== "all") params.month = parseInt(monthFilter);
+    if (yearFilter !== "all") params.year = parseInt(yearFilter);
+    return params;
+  }, [page, limit, statusFilter, searchTerm, monthFilter, yearFilter]);
 
-        const data = await ordersAPI.getAll(params);
-        setOrders(data);
-        if (data.total !== undefined) {
-          setTotalItems(data.total);
-        }
-      } catch (err) {
-        console.error("Error fetching orders:", err);
-        toast.error("Error al cargar pedidos", {
-          description: err.message,
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    const timer = setTimeout(() => {
-      fetchOrders();
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [statusFilter, searchTerm, page, limit, monthFilter, yearFilter]);
-
-  // Fetch stats separately
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const params = {};
-        if (monthFilter !== "all") {
-          params.month = parseInt(monthFilter);
-        }
-        if (yearFilter !== "all") {
-          params.year = parseInt(yearFilter);
-        }
-
-        const data = await ordersAPI.getStats(params);
-        setStats({
-          totalOrders: data.total_orders,
-          totalRevenue: data.total_revenue,
-          pending: data.by_status.pendiente || 0
-        });
-      } catch (err) {
-        console.error("Error fetching stats:", err);
-      }
-    };
-    fetchStats();
+  // Build SWR params for stats (month/year only)
+  const statsParams = useMemo(() => {
+    const params = {};
+    if (monthFilter !== "all") params.month = parseInt(monthFilter);
+    if (yearFilter !== "all") params.year = parseInt(yearFilter);
+    return params;
   }, [monthFilter, yearFilter]);
 
-  // Debug: log first order to see structure
-  useEffect(() => {
-    if (orders.length > 0) {
-      console.log('First order data:', orders[0]);
-    }
-  }, [orders]);
+  // Data Fetching with SWR
+  const { orders, total: totalItems } = useOrders(ordersParams);
+  const { stats: statsData } = useOrderStats(statsParams);
 
-  const filteredOrders = useMemo(() => {
-    return orders;
-  }, [orders]);
+  const totalOrders = statsData?.total_orders || 0;
+  const filteredRevenue = statsData?.total_revenue || 0;
+  const pendingOrders = statsData?.by_status?.pendiente || 0;
+
+  const filteredOrders = orders;
 
   const statusFilters = [
     { value: "all", label: "Todos" },
@@ -216,11 +156,6 @@ export default function MisPedidosPage() {
     { value: "entregado", label: "Entregado" },
     { value: "cancelado", label: "Cancelado" },
   ];
-
-  // Stats
-  const totalOrders = stats.totalOrders;
-  const filteredRevenue = stats.totalRevenue;
-  const pendingOrders = stats.pending;
 
   const handleDownloadRemito = async (orderId, orderNumber) => {
     try {
@@ -235,10 +170,7 @@ export default function MisPedidosPage() {
       document.body.removeChild(a);
       toast.success("Remito descargado");
     } catch (err) {
-      console.error("Error downloading remito:", err);
-      toast.error("Error al descargar remito", {
-        description: err.message,
-      });
+      toast.error("Error al descargar remito", { description: err.message });
     }
   };
 
@@ -318,10 +250,7 @@ export default function MisPedidosPage() {
             />
           </div>
           <div className="flex gap-2">
-            <Select
-              value={monthFilter}
-              onValueChange={setMonthFilter}
-            >
+            <Select value={monthFilter} onValueChange={setMonthFilter}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Mes" />
               </SelectTrigger>
@@ -335,10 +264,7 @@ export default function MisPedidosPage() {
               </SelectContent>
             </Select>
 
-            <Select
-              value={yearFilter}
-              onValueChange={setYearFilter}
-            >
+            <Select value={yearFilter} onValueChange={setYearFilter}>
               <SelectTrigger className="w-[100px]">
                 <SelectValue placeholder="Año" />
               </SelectTrigger>
@@ -379,7 +305,7 @@ export default function MisPedidosPage() {
           return (
             <Card key={order.id}>
               <CardHeader className="pb-2">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
                     <CardTitle className="text-lg">{order.order_number || `#${order.id}`}</CardTitle>
                     <Badge className={statusColorMap[orderStatus.color]}>
@@ -397,7 +323,7 @@ export default function MisPedidosPage() {
                       }}
                     >
                       <Eye className="w-4 h-4" />
-                      <span className="hidden sm:inline">Ver Detalle</span>
+                      Ver Detalle
                     </Button>
                     <Button
                       variant="outline"
@@ -409,7 +335,7 @@ export default function MisPedidosPage() {
                       }}
                     >
                       <FileDown className="w-4 h-4" />
-                      <span className="hidden sm:inline">Remito</span>
+                      Remito
                     </Button>
                     <p className="text-xl font-bold text-foreground ml-auto">
                       {formatCurrency(order.total)}
@@ -511,13 +437,12 @@ export default function MisPedidosPage() {
         totalPages={Math.ceil(totalItems / limit)}
         onPageChange={setPage}
         totalItems={totalItems}
-
         itemsPerPage={limit}
       />
 
       {/* Order Detail Modal */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="max-w-2xl w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto !p-4 sm:!p-6">
           <DialogHeader>
             <DialogTitle className="flex flex-wrap items-center gap-2 pr-6">
               <span className="text-base sm:text-lg">Detalle del Pedido {selectedOrder?.order_number || selectedOrder?.id}</span>
@@ -541,7 +466,7 @@ export default function MisPedidosPage() {
           </DialogHeader>
 
           {selectedOrder && (
-            <div className="space-y-6 mt-4">
+            <div className="space-y-6 mt-4 min-w-0">
               {/* Client Info */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <Card>
@@ -589,9 +514,7 @@ export default function MisPedidosPage() {
                           Factura {selectedOrder.invoice_type}
                         </Badge>
                       ) : (
-                        <Badge variant="secondary">
-                          Sin Factura
-                        </Badge>
+                        <Badge variant="secondary">Sin Factura</Badge>
                       )}
                     </div>
                   </CardContent>
@@ -719,19 +642,17 @@ export default function MisPedidosPage() {
       </Dialog>
 
       {/* Empty State */}
-      {
-        filteredOrders.length === 0 && (
-          <div className="text-center py-12">
-            <ClipboardList className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-foreground mb-1">
-              No se encontraron pedidos
-            </h3>
-            <p className="text-muted-foreground">
-              Intenta con otros términos de búsqueda o cambia el filtro de estado
-            </p>
-          </div>
-        )
-      }
-    </div >
+      {filteredOrders.length === 0 && (
+        <div className="text-center py-12">
+          <ClipboardList className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-foreground mb-1">
+            No se encontraron pedidos
+          </h3>
+          <p className="text-muted-foreground">
+            Intenta con otros términos de búsqueda o cambia el filtro de estado
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
